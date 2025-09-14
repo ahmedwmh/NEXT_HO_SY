@@ -1,40 +1,28 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
+import { useQuery } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { 
+  ArrowLeft, 
   User, 
   Phone, 
   Mail, 
   MapPin, 
   Calendar, 
   FileText, 
-  Heart, 
   Activity,
-  Stethoscope,
   TestTube,
-  Pill,
+  Stethoscope,
+  Heart,
   AlertTriangle,
   Edit,
-  Download,
-  Printer,
-  Share2,
-  Plus,
-  Eye,
-  Clock,
-  CheckCircle,
-  XCircle
+  Plus
 } from 'lucide-react'
-import { PatientProfileHeader } from '@/components/admin/patient-profile-header'
-import { PatientQuickActions } from '@/components/admin/patient-quick-actions'
-import { PatientCharts } from '@/components/admin/patient-charts'
-import { PatientMedicalHistory } from '@/components/admin/patient-medical-history'
-import { PatientVisits } from '@/components/admin/patient-visits'
-import { PatientTests } from '@/components/admin/patient-tests'
-import { PatientPrescriptions } from '@/components/admin/patient-prescriptions'
 
 interface Patient {
   id: string
@@ -71,115 +59,289 @@ interface Patient {
     }
   }
   createdAt: string
-  updatedAt: string
+  profilePhoto?: string
+}
+
+interface Visit {
+  id: string
+  scheduledAt: string
+  status: string
+  notes?: string
+  diagnosis?: string
+  prescription?: string
+  symptoms?: string
+  vitalSigns?: string
+  temperature?: string
+  bloodPressure?: string
+  heartRate?: string
+  weight?: string
+  height?: string
+  doctor: {
+    id: string
+    firstName: string
+    lastName: string
+    specialization: string
+  }
+  hospital: {
+    id: string
+    name: string
+  }
+  createdAt: string
+}
+
+interface Test {
+  id: string
+  name: string
+  description?: string
+  scheduledAt: string
+  status: string
+  results?: string
+  notes?: string
+  doctor: {
+    id: string
+    firstName: string
+    lastName: string
+    specialization: string
+  }
+  hospital: {
+    id: string
+    name: string
+  }
+  createdAt: string
 }
 
 export default function PatientProfilePage() {
   const params = useParams()
-  const [patient, setPatient] = useState<Patient | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState('overview')
+  const router = useRouter()
+  const patientId = params.id as string
 
-  useEffect(() => {
-    if (params.id) {
-      fetchPatient()
-    }
-  }, [params.id])
-
-  const fetchPatient = async () => {
-    try {
-      const response = await fetch(`/api/patients/${params.id}`)
-      if (response.ok) {
-        const data = await response.json()
-        setPatient(data)
-      } else {
-        console.error('خطأ في جلب بيانات المريض')
+  // Fetch patient data
+  const { data: patient, isLoading: patientLoading } = useQuery({
+    queryKey: ['patient', patientId],
+    queryFn: async () => {
+      const token = localStorage.getItem('token')
+      const response = await fetch(`/api/patients/${patientId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch patient')
       }
-    } catch (error) {
-      console.error('خطأ في جلب بيانات المريض:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
+      
+      return response.json()
+    },
+    enabled: !!patientId,
+  })
 
-  if (loading) {
+  // Fetch patient visits
+  const { data: visits, isLoading: visitsLoading } = useQuery({
+    queryKey: ['patient-visits', patientId],
+    queryFn: async () => {
+      const token = localStorage.getItem('token')
+      const response = await fetch(`/api/patients/${patientId}/visits`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch visits')
+      }
+      
+      return response.json()
+    },
+    enabled: !!patientId,
+  })
+
+  // Fetch patient tests
+  const { data: tests, isLoading: testsLoading } = useQuery({
+    queryKey: ['patient-tests', patientId],
+    queryFn: async () => {
+      const token = localStorage.getItem('token')
+      const response = await fetch(`/api/patients/${patientId}/tests`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch tests')
+      }
+      
+      return response.json()
+    },
+    enabled: !!patientId,
+  })
+
+  if (patientLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-lg">جاري التحميل...</div>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-2 text-gray-600">Loading patient data...</p>
+        </div>
       </div>
     )
   }
 
   if (!patient) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-lg text-red-600">لم يتم العثور على المريض</div>
+      <div className="text-center py-12">
+        <AlertTriangle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+        <h3 className="text-lg font-medium text-gray-900 mb-2">Patient not found</h3>
+        <p className="text-gray-600 mb-4">The patient you're looking for doesn't exist.</p>
+        <Button onClick={() => router.back()}>
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Go Back
+        </Button>
       </div>
     )
   }
 
-  const calculateAge = (dateOfBirth: string) => {
-    const today = new Date()
-    const birthDate = new Date(dateOfBirth)
-    let age = today.getFullYear() - birthDate.getFullYear()
-    const monthDiff = today.getMonth() - birthDate.getMonth()
-    
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-      age--
-    }
-    
-    return age
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('ar-SA', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    })
   }
 
-  const tabs = [
-    { id: 'overview', label: 'نظرة عامة', icon: Eye },
-    { id: 'medical', label: 'التاريخ الطبي', icon: FileText },
-    { id: 'visits', label: 'الزيارات', icon: Calendar },
-    { id: 'tests', label: 'الفحوصات', icon: TestTube },
-    { id: 'prescriptions', label: 'الوصفات', icon: Pill },
-    { id: 'charts', label: 'الرسوم البيانية', icon: Activity }
-  ]
+  const formatDateTime = (dateString: string) => {
+    return new Date(dateString).toLocaleString('ar-SA', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  }
+
+  const getStatusBadge = (status: string) => {
+    const statusMap = {
+      'SCHEDULED': { variant: 'outline' as const, label: 'مجدولة' },
+      'IN_PROGRESS': { variant: 'default' as const, label: 'جارية' },
+      'COMPLETED': { variant: 'secondary' as const, label: 'مكتملة' },
+      'CANCELLED': { variant: 'destructive' as const, label: 'ملغية' },
+    }
+    
+    const statusInfo = statusMap[status as keyof typeof statusMap] || { variant: 'outline' as const, label: status }
+    return <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>
+  }
 
   return (
-    <div className="w-full space-y-6">
-      {/* Patient Profile Header */}
-      <PatientProfileHeader patient={patient} />
-
-      {/* Quick Actions */}
-      <PatientQuickActions patientId={patient.id} />
-
-      {/* Navigation Tabs */}
-      <Card>
-        <CardContent className="p-0">
-          <div className="border-b border-gray-200">
-            <nav className="flex space-x-8 rtl:space-x-reverse px-6">
-              {tabs.map((tab) => {
-                const Icon = tab.icon
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`flex items-center space-x-2 rtl:space-x-reverse py-4 px-1 border-b-2 font-medium text-sm ${
-                      activeTab === tab.id
-                        ? 'border-hospital-blue text-hospital-blue'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                    }`}
-                  >
-                    <Icon className="h-4 w-4" />
-                    <span>{tab.label}</span>
-                  </button>
-                )
-              })}
-            </nav>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-4 rtl:space-x-reverse">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => router.back()}
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            العودة
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">
+              {patient.firstName} {patient.lastName}
+            </h1>
+            <p className="text-gray-600">رقم المريض: {patient.patientNumber}</p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+        <div className="flex space-x-2 rtl:space-x-reverse">
+          <Button variant="outline">
+            <Edit className="h-4 w-4 mr-2" />
+            تعديل
+          </Button>
+          <Button>
+            <Plus className="h-4 w-4 mr-2" />
+            زيارة جديدة
+          </Button>
+        </div>
+      </div>
 
-      {/* Tab Content */}
-      <div className="space-y-6">
-        {activeTab === 'overview' && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Basic Information */}
+      {/* Patient Info Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center space-x-3 rtl:space-x-reverse">
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <User className="h-6 w-6 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-600">العمر</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {new Date().getFullYear() - new Date(patient.dateOfBirth).getFullYear()} سنة
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center space-x-3 rtl:space-x-reverse">
+              <div className="p-2 bg-green-100 rounded-lg">
+                <Activity className="h-6 w-6 text-green-600" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-600">الزيارات</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {visits?.data?.length || 0}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center space-x-3 rtl:space-x-reverse">
+              <div className="p-2 bg-purple-100 rounded-lg">
+                <TestTube className="h-6 w-6 text-purple-600" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-600">الفحوصات</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {tests?.data?.length || 0}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center space-x-3 rtl:space-x-reverse">
+              <div className="p-2 bg-red-100 rounded-lg">
+                <Heart className="h-6 w-6 text-red-600" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-600">فصيلة الدم</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {patient.bloodType || 'غير محدد'}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Main Content Tabs */}
+      <Tabs defaultValue="info" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="info">المعلومات الشخصية</TabsTrigger>
+          <TabsTrigger value="visits">الزيارات</TabsTrigger>
+          <TabsTrigger value="tests">الفحوصات</TabsTrigger>
+          <TabsTrigger value="medical">التاريخ الطبي</TabsTrigger>
+        </TabsList>
+
+        {/* Personal Information Tab */}
+        <TabsContent value="info" className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Basic Info */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2 rtl:space-x-reverse">
@@ -190,43 +352,26 @@ export default function PatientProfilePage() {
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-sm font-medium text-gray-500">الاسم الكامل</label>
-                    <p className="text-sm font-semibold">
-                      {patient.firstName} {patient.lastName}
-                      {patient.middleName && ` ${patient.middleName}`}
-                    </p>
+                    <p className="text-sm font-medium text-gray-600">الاسم الكامل</p>
+                    <p className="text-gray-900">{patient.firstName} {patient.lastName}</p>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-500">رقم المريض</label>
-                    <p className="text-sm font-semibold text-hospital-blue">{patient.patientNumber}</p>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-sm font-medium text-gray-500">العمر</label>
-                    <p className="text-sm font-semibold">{calculateAge(patient.dateOfBirth)} سنة</p>
+                    <p className="text-sm font-medium text-gray-600">تاريخ الميلاد</p>
+                    <p className="text-gray-900">{formatDate(patient.dateOfBirth)}</p>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-500">الجنس</label>
-                    <p className="text-sm font-semibold">{patient.gender}</p>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-sm font-medium text-gray-500">فصيلة الدم</label>
-                    <Badge variant="outline">{patient.bloodType || 'غير محدد'}</Badge>
+                    <p className="text-sm font-medium text-gray-600">الجنس</p>
+                    <p className="text-gray-900">{patient.gender}</p>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-500">الحالة</label>
-                    <Badge variant={patient.isActive ? "default" : "secondary"}>
-                      {patient.isActive ? 'نشط' : 'غير نشط'}
-                    </Badge>
+                    <p className="text-sm font-medium text-gray-600">الجنسية</p>
+                    <p className="text-gray-900">{patient.nationality || 'غير محدد'}</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Contact Information */}
+            {/* Contact Info */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2 rtl:space-x-reverse">
@@ -238,69 +383,242 @@ export default function PatientProfilePage() {
                 <div className="space-y-3">
                   <div className="flex items-center space-x-3 rtl:space-x-reverse">
                     <Phone className="h-4 w-4 text-gray-400" />
-                    <span className="text-sm">{patient.phone}</span>
+                    <span className="text-gray-900">{patient.phone || 'غير محدد'}</span>
                   </div>
-                  {patient.email && (
-                    <div className="flex items-center space-x-3 rtl:space-x-reverse">
-                      <Mail className="h-4 w-4 text-gray-400" />
-                      <span className="text-sm">{patient.email}</span>
-                    </div>
-                  )}
+                  <div className="flex items-center space-x-3 rtl:space-x-reverse">
+                    <Mail className="h-4 w-4 text-gray-400" />
+                    <span className="text-gray-900">{patient.email || 'غير محدد'}</span>
+                  </div>
                   <div className="flex items-center space-x-3 rtl:space-x-reverse">
                     <MapPin className="h-4 w-4 text-gray-400" />
-                    <span className="text-sm">{patient.address}</span>
+                    <span className="text-gray-900">{patient.address || 'غير محدد'}</span>
                   </div>
                   <div className="flex items-center space-x-3 rtl:space-x-reverse">
-                    <AlertTriangle className="h-4 w-4 text-red-400" />
-                    <span className="text-sm">{patient.emergencyContact}</span>
+                    <AlertTriangle className="h-4 w-4 text-gray-400" />
+                    <span className="text-gray-900">{patient.emergencyContact || 'غير محدد'}</span>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Medical Information */}
+            {/* Hospital Info */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2 rtl:space-x-reverse">
-                  <Heart className="h-5 w-5" />
+                  <MapPin className="h-5 w-5" />
+                  <span>المستشفى</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-gray-600">المستشفى</p>
+                  <p className="text-gray-900">{patient.hospital.name}</p>
+                  <p className="text-sm text-gray-600">{patient.hospital.city.name}</p>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Medical Info */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2 rtl:space-x-reverse">
+                  <Stethoscope className="h-5 w-5" />
                   <span>المعلومات الطبية</span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div>
-                  <label className="text-sm font-medium text-gray-500">المستشفى</label>
-                  <p className="text-sm font-semibold">{patient.hospital.name}</p>
-                  <p className="text-xs text-gray-500">{patient.hospital.city.name}</p>
-                </div>
-                {patient.allergies && patient.allergies.length > 0 && (
+                <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-sm font-medium text-gray-500">الحساسية</label>
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {patient.allergies.map((allergy, index) => (
-                        <Badge key={index} variant="destructive" className="text-xs">
-                          {allergy}
-                        </Badge>
-                      ))}
-                    </div>
+                    <p className="text-sm font-medium text-gray-600">فصيلة الدم</p>
+                    <p className="text-gray-900">{patient.bloodType || 'غير محدد'}</p>
                   </div>
-                )}
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">الحساسية</p>
+                    <p className="text-gray-900">
+                      {patient.allergies?.length ? patient.allergies.join(', ') : 'لا توجد'}
+                    </p>
+                  </div>
+                </div>
                 {patient.medicalHistory && (
                   <div>
-                    <label className="text-sm font-medium text-gray-500">التاريخ الطبي</label>
-                    <p className="text-sm text-gray-700 mt-1">{patient.medicalHistory}</p>
+                    <p className="text-sm font-medium text-gray-600">التاريخ الطبي</p>
+                    <p className="text-gray-900 text-sm">{patient.medicalHistory}</p>
                   </div>
                 )}
               </CardContent>
             </Card>
           </div>
-        )}
+        </TabsContent>
 
-        {activeTab === 'medical' && <PatientMedicalHistory patientId={patient.id} />}
-        {activeTab === 'visits' && <PatientVisits patientId={patient.id} />}
-        {activeTab === 'tests' && <PatientTests patientId={patient.id} />}
-        {activeTab === 'prescriptions' && <PatientPrescriptions patientId={patient.id} />}
-        {activeTab === 'charts' && <PatientCharts patientId={patient.id} />}
-      </div>
+        {/* Visits Tab */}
+        <TabsContent value="visits" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2 rtl:space-x-reverse">
+                <Activity className="h-5 w-5" />
+                <span>زيارات المريض</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {visitsLoading ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                  <p className="mt-2 text-gray-600">Loading visits...</p>
+                </div>
+              ) : visits?.data?.length ? (
+                <div className="space-y-4">
+                  {visits.data.map((visit: Visit) => (
+                    <div key={visit.id} className="border rounded-lg p-4 hover:bg-gray-50">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3 rtl:space-x-reverse">
+                          <Calendar className="h-5 w-5 text-gray-400" />
+                          <div>
+                            <p className="font-medium text-gray-900">
+                              {formatDateTime(visit.scheduledAt)}
+                            </p>
+                            <p className="text-sm text-gray-600">
+                              د. {visit.doctor.firstName} {visit.doctor.lastName} - {visit.doctor.specialization}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-2 rtl:space-x-reverse">
+                          {getStatusBadge(visit.status)}
+                        </div>
+                      </div>
+                      {visit.diagnosis && (
+                        <div className="mt-3">
+                          <p className="text-sm font-medium text-gray-600">التشخيص</p>
+                          <p className="text-sm text-gray-900">{visit.diagnosis}</p>
+                        </div>
+                      )}
+                      {visit.notes && (
+                        <div className="mt-2">
+                          <p className="text-sm font-medium text-gray-600">ملاحظات</p>
+                          <p className="text-sm text-gray-900">{visit.notes}</p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <Activity className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-600">لا توجد زيارات مسجلة</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Tests Tab */}
+        <TabsContent value="tests" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2 rtl:space-x-reverse">
+                <TestTube className="h-5 w-5" />
+                <span>فحوصات المريض</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {testsLoading ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                  <p className="mt-2 text-gray-600">Loading tests...</p>
+                </div>
+              ) : tests?.data?.length ? (
+                <div className="space-y-4">
+                  {tests.data.map((test: Test) => (
+                    <div key={test.id} className="border rounded-lg p-4 hover:bg-gray-50">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3 rtl:space-x-reverse">
+                          <TestTube className="h-5 w-5 text-gray-400" />
+                          <div>
+                            <p className="font-medium text-gray-900">{test.name}</p>
+                            <p className="text-sm text-gray-600">
+                              {formatDateTime(test.scheduledAt)} - د. {test.doctor.firstName} {test.doctor.lastName}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-2 rtl:space-x-reverse">
+                          {getStatusBadge(test.status)}
+                        </div>
+                      </div>
+                      {test.description && (
+                        <div className="mt-3">
+                          <p className="text-sm font-medium text-gray-600">الوصف</p>
+                          <p className="text-sm text-gray-900">{test.description}</p>
+                        </div>
+                      )}
+                      {test.results && (
+                        <div className="mt-3">
+                          <p className="text-sm font-medium text-gray-600">النتائج</p>
+                          <p className="text-sm text-gray-900">{test.results}</p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <TestTube className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-600">لا توجد فحوصات مسجلة</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Medical History Tab */}
+        <TabsContent value="medical" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2 rtl:space-x-reverse">
+                <FileText className="h-5 w-5" />
+                <span>التاريخ الطبي</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-2">التاريخ الطبي السابق</h4>
+                  <p className="text-gray-600">
+                    {patient.medicalHistory || 'لا يوجد تاريخ طبي مسجل'}
+                  </p>
+                </div>
+                
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-2">الحساسية</h4>
+                  <p className="text-gray-600">
+                    {patient.allergies?.length ? patient.allergies.join(', ') : 'لا توجد حساسية مسجلة'}
+                  </p>
+                </div>
+
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-2">معلومات إضافية</h4>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p className="font-medium text-gray-600">رقم الهوية</p>
+                      <p className="text-gray-900">{patient.idNumber || 'غير محدد'}</p>
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-600">رقم جواز السفر</p>
+                      <p className="text-gray-900">{patient.passportNumber || 'غير محدد'}</p>
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-600">رقم التأمين</p>
+                      <p className="text-gray-900">{patient.insuranceNumber || 'غير محدد'}</p>
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-600">شركة التأمين</p>
+                      <p className="text-gray-900">{patient.insuranceCompany || 'غير محدد'}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

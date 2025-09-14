@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url)
+    const cityId = searchParams.get('cityId')
+
+    const whereClause = cityId ? { cityId } : {}
+
     const hospitals = await prisma.hospital.findMany({
+      where: whereClause,
       include: {
         city: {
           select: {
@@ -32,7 +38,7 @@ export async function GET() {
       }
     })
 
-    return NextResponse.json(hospitals)
+    return NextResponse.json({ data: hospitals })
   } catch (error) {
     console.error('خطأ في جلب المستشفيات:', error)
     return NextResponse.json(

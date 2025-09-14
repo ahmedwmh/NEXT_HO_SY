@@ -17,6 +17,7 @@ import { uploadPatientPhoto, ALLOWED_IMAGE_TYPES, MAX_IMAGE_SIZE_MB } from '@/li
 export function PatientForm() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [uploadedPhotoUrl, setUploadedPhotoUrl] = useState<string | null>(null)
+  const [selectedCityId, setSelectedCityId] = useState<string>('')
   const router = useRouter()
 
   const {
@@ -29,12 +30,34 @@ export function PatientForm() {
     resolver: zodResolver(createPatientSchema),
   })
 
-  // Fetch hospitals for the select dropdown
-  const { data: hospitals } = useQuery({
-    queryKey: ['hospitals'],
+  // Fetch cities for the select dropdown
+  const { data: cities } = useQuery({
+    queryKey: ['cities'],
     queryFn: async () => {
       const token = localStorage.getItem('token')
-      const response = await fetch('/api/hospitals', {
+      const response = await fetch('/api/cities', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch cities')
+      }
+      
+      const result = await response.json()
+      return result.data || []
+    },
+  })
+
+  // Fetch hospitals based on selected city
+  const { data: hospitals } = useQuery({
+    queryKey: ['hospitals', selectedCityId],
+    queryFn: async () => {
+      if (!selectedCityId) return []
+      
+      const token = localStorage.getItem('token')
+      const response = await fetch(`/api/hospitals?cityId=${selectedCityId}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -47,6 +70,7 @@ export function PatientForm() {
       const result = await response.json()
       return result.data || []
     },
+    enabled: !!selectedCityId,
   })
 
   const createPatientMutation = useMutation({
@@ -294,24 +318,54 @@ export function PatientForm() {
               )}
             </div>
 
-            {/* Hospital Selection */}
-            <div className="space-y-2">
-              <Label htmlFor="hospitalId">Hospital *</Label>
-              <Select onValueChange={(value) => setValue('hospitalId', value)}>
-                <SelectTrigger className="hospital-input">
-                  <SelectValue placeholder="Select hospital" />
-                </SelectTrigger>
-                <SelectContent>
-                  {hospitals?.map((hospital: any) => (
-                    <SelectItem key={hospital.id} value={hospital.id}>
-                      {hospital.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {errors.hospitalId && (
-                <p className="text-sm text-red-600">{errors.hospitalId.message}</p>
-              )}
+            {/* City and Hospital Selection */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <Label htmlFor="cityId">City *</Label>
+                <Select onValueChange={(value) => {
+                  setSelectedCityId(value)
+                  setValue('hospitalId', '') // Reset hospital selection when city changes
+                }}>
+                  <SelectTrigger className="hospital-input">
+                    <SelectValue placeholder="Select city first" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {cities?.map((city: any) => (
+                      <SelectItem key={city.id} value={city.id}>
+                        {city.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {errors.cityId && (
+                  <p className="text-sm text-red-600">{errors.cityId.message}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="hospitalId">Hospital *</Label>
+                <Select 
+                  onValueChange={(value) => setValue('hospitalId', value)}
+                  disabled={!selectedCityId}
+                >
+                  <SelectTrigger className="hospital-input">
+                    <SelectValue placeholder={selectedCityId ? "Select hospital" : "Select city first"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {hospitals?.map((hospital: any) => (
+                      <SelectItem key={hospital.id} value={hospital.id}>
+                        {hospital.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {errors.hospitalId && (
+                  <p className="text-sm text-red-600">{errors.hospitalId.message}</p>
+                )}
+                {!selectedCityId && (
+                  <p className="text-sm text-gray-500">Please select a city first</p>
+                )}
+              </div>
             </div>
 
             {/* Form Actions */}

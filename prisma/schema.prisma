@@ -70,6 +70,7 @@ model City {
 
   // Relations
   hospitals Hospital[]
+  patients  Patient[]
 
   @@index([name])
   @@map("cities")
@@ -151,6 +152,7 @@ model Staff {
 
 model Patient {
   id              String    @id @default(cuid())
+  cityId          String
   hospitalId      String
   patientNumber   String    @unique // رقم المريض الفريد
   firstName       String
@@ -181,6 +183,7 @@ model Patient {
   updatedAt       DateTime  @updatedAt
 
   // Relations
+  city        City         @relation(fields: [cityId], references: [id], onDelete: Cascade)
   hospital    Hospital     @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
   visits      Visit[]
   tests       Test[]
@@ -190,6 +193,7 @@ model Patient {
   attachments Attachment[]
   prescriptions Prescription[]
 
+  @@index([cityId])
   @@index([hospitalId])
   @@index([patientNumber])
   @@index([firstName, lastName])

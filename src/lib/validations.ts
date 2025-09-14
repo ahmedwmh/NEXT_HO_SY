@@ -68,6 +68,7 @@ export const updateStaffSchema = createStaffSchema.partial()
 
 // Patient schemas
 export const createPatientSchema = z.object({
+  cityId: z.string().min(1, 'City is required'),
   hospitalId: z.string().min(1, 'Hospital is required'),
   firstName: z.string().min(1, 'First name is required'),
   lastName: z.string().min(1, 'Last name is required'),

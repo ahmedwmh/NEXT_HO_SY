@@ -199,7 +199,10 @@ export default function PatientsPage() {
       key: 'firstName' as keyof Patient,
       label: 'الاسم',
       render: (value: string, patient: Patient) => (
-        <div>
+        <div 
+          className="cursor-pointer hover:text-blue-600 transition-colors"
+          onClick={() => window.location.href = `/admin/patients/${patient.id}`}
+        >
           <div className="font-semibold">{patient.firstName} {patient.lastName}</div>
           {patient.middleName && <div className="text-sm text-gray-500">{patient.middleName}</div>}
         </div>
