@@ -322,3 +322,4 @@ For support and questions:
 
 **Built with ❤️ for the healthcare industry**
 # hospitalSystem
+# NEXT_HO_SYS
