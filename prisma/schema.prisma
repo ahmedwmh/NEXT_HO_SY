@@ -1,0 +1,399 @@
+// نظام إدارة المستشفى الذكي - Smart Hospital Management System
+// نظام متكامل لإدارة المستشفيات والمرضى والأطباء
+// تم تطويره ليكون سريع الاستجابة ومحسن للأداء
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DIRECT_DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  DOCTOR
+  STAFF
+}
+
+enum VisitStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum TestStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum TreatmentStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum OperationStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  role      UserRole
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  doctorProfile Doctor?
+  staffProfile  Staff?
+
+  @@index([email])
+  @@index([role])
+  @@map("users")
+}
+
+model City {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  hospitals Hospital[]
+
+  @@index([name])
+  @@map("cities")
+}
+
+model Hospital {
+  id        String   @id @default(cuid())
+  name      String
+  address   String
+  phone     String?
+  email     String?
+  cityId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  city         City         @relation(fields: [cityId], references: [id], onDelete: Cascade)
+  doctors      Doctor[]
+  staff        Staff[]
+  patients     Patient[]
+  visits       Visit[]
+  tests        Test[]
+  treatments   Treatment[]
+  operations   Operation[]
+  prescriptions Prescription[]
+
+  @@index([cityId])
+  @@index([name])
+  @@map("hospitals")
+}
+
+model Doctor {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  hospitalId  String
+  firstName   String
+  lastName    String
+  specialization String
+  phone       String?
+  licenseNumber String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  hospital  Hospital   @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  visits    Visit[]
+  tests     Test[]
+  treatments Treatment[]
+  operations Operation[]
+  prescriptions Prescription[]
+
+  @@index([hospitalId])
+  @@index([specialization])
+  @@index([firstName, lastName])
+  @@map("doctors")
+}
+
+model Staff {
+  id         String   @id @default(cuid())
+  userId     String   @unique
+  hospitalId String
+  firstName  String
+  lastName   String
+  position   String
+  phone      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relations
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  hospital Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+
+  @@index([hospitalId])
+  @@index([position])
+  @@index([firstName, lastName])
+  @@map("staff")
+}
+
+model Patient {
+  id              String    @id @default(cuid())
+  hospitalId      String
+  patientNumber   String    @unique // رقم المريض الفريد
+  firstName       String
+  lastName        String
+  middleName      String?   // الاسم الأوسط
+  dateOfBirth     DateTime
+  gender          String
+  nationality     String?   // الجنسية
+  idNumber        String?   // رقم الهوية
+  passportNumber  String?   // رقم جواز السفر
+  phone           String?
+  email           String?
+  address         String?
+  city            String?   // المدينة
+  emergencyContact String?
+  emergencyPhone  String?   // رقم الطوارئ
+  bloodType       String?
+  allergies       String?
+  medicalHistory  String?
+  profilePhoto    String?   // صورة المريض
+  insuranceNumber String?   // رقم التأمين
+  insuranceCompany String?  // شركة التأمين
+  maritalStatus   String?   // الحالة الاجتماعية
+  occupation      String?   // المهنة
+  notes           String?   // ملاحظات إضافية
+  isActive        Boolean   @default(true) // حالة المريض
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  hospital    Hospital     @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  visits      Visit[]
+  tests       Test[]
+  treatments  Treatment[]
+  operations  Operation[]
+  diseases    Disease[]
+  attachments Attachment[]
+  prescriptions Prescription[]
+
+  @@index([hospitalId])
+  @@index([patientNumber])
+  @@index([firstName, lastName])
+  @@index([phone])
+  @@index([email])
+  @@index([isActive])
+  @@index([createdAt])
+  @@map("patients")
+}
+
+model Visit {
+  id          String      @id @default(cuid())
+  patientId   String
+  doctorId    String
+  hospitalId  String
+  scheduledAt DateTime
+  status      VisitStatus @default(SCHEDULED)
+  notes       String?
+  diagnosis   String?
+  prescription String?
+  symptoms    String?     // الأعراض
+  vitalSigns  String?     // العلامات الحيوية
+  temperature String?     // درجة الحرارة
+  bloodPressure String?   // ضغط الدم
+  heartRate   String?     // معدل النبض
+  weight      String?     // الوزن
+  height      String?     // الطول
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  // Relations
+  patient  Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  doctor   Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  hospital Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  prescriptions Prescription[]
+
+  @@index([patientId])
+  @@index([doctorId])
+  @@index([hospitalId])
+  @@index([scheduledAt])
+  @@index([status])
+  @@index([createdAt])
+  @@map("visits")
+}
+
+model Test {
+  id          String     @id @default(cuid())
+  patientId   String
+  doctorId    String
+  hospitalId  String
+  name        String
+  description String?
+  scheduledAt DateTime
+  status      TestStatus @default(SCHEDULED)
+  results     String?
+  notes       String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  // Relations
+  patient  Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  doctor   Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  hospital Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
+  @@index([doctorId])
+  @@index([hospitalId])
+  @@index([scheduledAt])
+  @@index([status])
+  @@index([name])
+  @@map("tests")
+}
+
+model Treatment {
+  id          String          @id @default(cuid())
+  patientId   String
+  doctorId    String
+  hospitalId  String
+  name        String
+  description String?
+  scheduledAt DateTime
+  status      TreatmentStatus @default(SCHEDULED)
+  notes       String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  // Relations
+  patient  Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  doctor   Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  hospital Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
+  @@index([doctorId])
+  @@index([hospitalId])
+  @@index([scheduledAt])
+  @@index([status])
+  @@index([name])
+  @@map("treatments")
+}
+
+model Operation {
+  id          String          @id @default(cuid())
+  patientId   String
+  doctorId    String
+  hospitalId  String
+  name        String
+  description String?
+  scheduledAt DateTime
+  status      OperationStatus @default(SCHEDULED)
+  notes       String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  // Relations
+  patient  Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  doctor   Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  hospital Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
+  @@index([doctorId])
+  @@index([hospitalId])
+  @@index([scheduledAt])
+  @@index([status])
+  @@index([name])
+  @@map("operations")
+}
+
+model Disease {
+  id          String   @id @default(cuid())
+  patientId   String
+  name        String
+  description String?
+  diagnosedAt DateTime
+  severity    String?
+  status      String?  // Active, Cured, Chronic, etc.
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
+  @@index([name])
+  @@index([diagnosedAt])
+  @@index([status])
+  @@map("diseases")
+}
+
+model Prescription {
+  id          String   @id @default(cuid())
+  patientId   String
+  doctorId    String
+  hospitalId  String
+  visitId     String?  // ربط بالزيارة
+  medication  String   // اسم الدواء
+  dosage      String   // الجرعة
+  frequency   String   // التكرار
+  duration    String   // المدة
+  instructions String? // التعليمات
+  startDate   DateTime
+  endDate     DateTime?
+  status      String   @default("ACTIVE") // ACTIVE, COMPLETED, CANCELLED
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  patient  Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  doctor   Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  hospital Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  visit    Visit?   @relation(fields: [visitId], references: [id], onDelete: SetNull)
+
+  @@index([patientId])
+  @@index([doctorId])
+  @@index([hospitalId])
+  @@index([visitId])
+  @@index([medication])
+  @@index([status])
+  @@index([startDate])
+  @@map("prescriptions")
+}
+
+model Attachment {
+  id          String   @id @default(cuid())
+  patientId   String
+  fileName    String
+  fileUrl     String   // Supabase storage URL
+  fileType    String
+  fileSize    Int?     // حجم الملف بالبايت
+  category    String?  // فئة المرفق (تقارير، صور، وثائق)
+  description String?
+  isPrivate   Boolean  @default(false) // مرفق خاص
+  uploadedBy  String?  // من رفع الملف
+  uploadedAt  DateTime @default(now())
+
+  // Relations
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
+  @@index([fileType])
+  @@index([category])
+  @@index([uploadedAt])
+  @@index([isPrivate])
+  @@map("attachments")
+}
+
