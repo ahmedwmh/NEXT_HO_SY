@@ -33,7 +33,8 @@ import { ApiResponse, PaginatedResponse } from '@/types'
 // Helper function for getting user from token
 async function getUserFromToken(token: string) {
   try {
-    const user = await prisma.user.findUnique({
+    const prismaClient = await getPrisma()
+    const user = await prismaClient.user.findUnique({
       where: { id: token },
       include: { doctorProfile: true, staffProfile: true }
     })

@@ -5,17 +5,21 @@ const globalForPrisma = globalThis as unknown as {
 }
 
 // Use the direct database URL to avoid connection pooling issues
-const prismaClient = new PrismaClient({
-  datasources: {
-    db: {
-      url: process.env.DIRECT_DATABASE_URL, // Use direct connection to avoid pooling issues
+const createPrismaClient = () => {
+  return new PrismaClient({
+    datasources: {
+      db: {
+        url: process.env.DIRECT_DATABASE_URL || process.env.DATABASE_URL, // Use direct connection to avoid pooling issues
+      },
     },
-  },
-  log: ['error'],
-  errorFormat: 'pretty',
-})
+    log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+    errorFormat: 'pretty',
+  })
+}
 
-export const prisma = globalForPrisma.prisma ?? prismaClient
+const prismaClient = globalForPrisma.prisma ?? createPrismaClient()
 
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
+export const prisma = prismaClient
+
+if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prismaClient
 
