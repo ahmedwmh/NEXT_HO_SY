@@ -51,7 +51,7 @@ async function getUserFromToken(token: string) {
     console.error("Error getting user from token:", error)
     return null
   }
-}}
+}
 
 // Middleware for authentication
 app.use('*', async (c, next) => {
