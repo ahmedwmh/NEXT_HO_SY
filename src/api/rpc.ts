@@ -33,8 +33,7 @@ import { ApiResponse, PaginatedResponse } from '@/types'
 // Helper function for getting user from token
 async function getUserFromToken(token: string) {
   try {
-    const prismaClient = await getPrisma()
-    const user = await prismaClient.user.findUnique({
+    const user = await prisma.user.findUnique({
       where: { id: token },
       include: { doctorProfile: true, staffProfile: true }
     })
@@ -49,10 +48,10 @@ async function getUserFromToken(token: string) {
       staffProfile: user.staffProfile || undefined,
     }
   } catch (error) {
-    console.error('Error getting user from token:', error)
+    console.error("Error getting user from token:", error)
     return null
   }
-}
+}}
 
 // Middleware for authentication
 app.use('*', async (c, next) => {
