@@ -4,14 +4,9 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
 }
 
-// Use the direct database URL to avoid connection pooling issues
+// Create Prisma client with Supabase configuration
 const createPrismaClient = () => {
   return new PrismaClient({
-    datasources: {
-      db: {
-        url: process.env.DIRECT_DATABASE_URL || process.env.DATABASE_URL, // Use direct connection to avoid pooling issues
-      },
-    },
     log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
     errorFormat: 'pretty',
   })

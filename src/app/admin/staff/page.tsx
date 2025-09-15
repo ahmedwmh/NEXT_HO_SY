@@ -9,9 +9,15 @@ import { useCrud } from '@/hooks/use-crud'
 import { Badge } from '@/components/ui/badge'
 import { UserPlus, Phone, Mail, MapPin, Briefcase } from 'lucide-react'
 
+interface City {
+  id: string
+  name: string
+}
+
 interface Hospital {
   id: string
   name: string
+  cityId: string
   city: {
     id: string
     name: string
@@ -46,7 +52,10 @@ const staffPositions = [
 ]
 
 export default function StaffPage() {
+  const [cities, setCities] = useState<City[]>([])
   const [hospitals, setHospitals] = useState<Hospital[]>([])
+  const [filteredHospitals, setFilteredHospitals] = useState<Hospital[]>([])
+  const [selectedCityId, setSelectedCityId] = useState('')
   const [showAddForm, setShowAddForm] = useState(false)
   const [editingStaff, setEditingStaff] = useState<Staff | null>(null)
   const [deletingStaff, setDeletingStaff] = useState<Staff | null>(null)
@@ -79,18 +88,36 @@ export default function StaffPage() {
   })
 
   useEffect(() => {
+    fetchCities()
     fetchHospitals()
     fetch()
   }, [])
+
+  const fetchCities = async () => {
+    try {
+      const response = await (globalThis as any).fetch('/api/cities')
+      const data = await response.json()
+      setCities(data.data || data || [])
+    } catch (error) {
+      console.error('خطأ في جلب المدن:', error)
+    }
+  }
 
   const fetchHospitals = async () => {
     try {
       const response = await (globalThis as any).fetch('/api/hospitals')
       const data = await response.json()
-      setHospitals(data)
+      setHospitals(data.data || data || [])
     } catch (error) {
       console.error('خطأ في جلب المستشفيات:', error)
     }
+  }
+
+  const handleCityChange = (cityId: string) => {
+    setSelectedCityId(cityId)
+    setFormData({ ...formData, hospitalId: '' })
+    const cityHospitals = hospitals.filter(hospital => hospital.cityId === cityId)
+    setFilteredHospitals(cityHospitals)
   }
 
   const handleAdd = () => {
@@ -98,6 +125,8 @@ export default function StaffPage() {
     setFormData({
       firstName: '', lastName: '', position: '', phone: '', email: '', password: '', hospitalId: ''
     })
+    setSelectedCityId('')
+    setFilteredHospitals([])
     setShowAddForm(true)
   }
 
@@ -255,12 +284,21 @@ export default function StaffPage() {
                 options={staffPositions.map(p => ({ value: p, label: p }))}
               />
             </FormField>
+            <FormField label="المدينة" required>
+              <SelectInput
+                value={selectedCityId}
+                onChange={handleCityChange}
+                placeholder="اختر المدينة أولاً"
+                options={cities.map(c => ({ value: c.id, label: c.name }))}
+              />
+            </FormField>
             <FormField label="المستشفى" required>
               <SelectInput
                 value={formData.hospitalId}
                 onChange={(value) => setFormData({ ...formData, hospitalId: value })}
-                placeholder="اختر المستشفى"
-                options={hospitals.map(h => ({ value: h.id, label: `${h.name} - ${h.city.name}` }))}
+                placeholder={selectedCityId ? "اختر المستشفى" : "اختر المدينة أولاً"}
+                options={filteredHospitals.map(h => ({ value: h.id, label: h.name }))}
+                disabled={!selectedCityId}
               />
             </FormField>
           </FormGrid>

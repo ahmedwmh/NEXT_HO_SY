@@ -5,48 +5,13 @@ import { UniversalTable } from '@/components/ui/universal-table'
 import { FormModal } from '@/components/ui/form-modal'
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
 import { FormField, FormSection, FormGrid, TextInput, SelectInput, TextArea } from '@/components/ui/form-field'
-import { useCrud } from '@/hooks/use-crud'
+import { ImageUpload } from '@/components/ui/image-upload'
 import { Badge } from '@/components/ui/badge'
-import { Users, Phone, Mail, MapPin, Calendar, FileText } from 'lucide-react'
-
-interface Hospital {
-  id: string
-  name: string
-  city: {
-    id: string
-    name: string
-  }
-}
-
-interface Patient {
-  id: string
-  patientNumber: string
-  firstName: string
-  lastName: string
-  middleName?: string
-  dateOfBirth: string
-  gender: string
-  phone: string
-  email?: string
-  address: string
-  emergencyContact: string
-  bloodType: string
-  allergies?: string[]
-  medicalHistory?: string
-  nationality?: string
-  idNumber?: string
-  passportNumber?: string
-  city?: string
-  insuranceNumber?: string
-  insuranceCompany?: string
-  maritalStatus?: string
-  occupation?: string
-  notes?: string
-  isActive: boolean
-  hospitalId: string
-  hospital: Hospital
-  createdAt: string
-}
+import { Phone, MapPin, Calendar } from 'lucide-react'
+import { useData } from '@/hooks/use-data'
+import { usePatients } from '@/hooks/use-patients'
+import { usePatientForm } from '@/hooks/use-patient-form'
+import type { Patient, Hospital, Doctor } from '@/lib/services/data-service'
 
 const bloodTypes = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
 const genders = ['ذكر', 'أنثى']
@@ -54,110 +19,85 @@ const maritalStatuses = ['أعزب', 'متزوج', 'مطلق', 'أرمل']
 const nationalities = ['عراقي', 'سوري', 'مصري', 'أردني', 'لبناني', 'سعودي', 'إماراتي', 'كويتي', 'قطري', 'بحريني', 'عماني', 'يمني', 'أخرى']
 
 export default function PatientsPage() {
-  const [hospitals, setHospitals] = useState<Hospital[]>([])
+  console.log('🏗️ PatientsPage: Component rendering...')
+  
+  // Data fetching
+  const { cities, hospitals, doctors, patients: dataPatients, loading: dataLoading, error: dataError } = useData()
+  
+  console.log('📊 PatientsPage: Data state:', {
+    citiesCount: cities.length,
+    hospitalsCount: hospitals.length,
+    doctorsCount: doctors.length,
+    patientsCount: dataPatients.length,
+    dataLoading,
+    dataError
+  })
+  
+  // Patient operations
+  const {
+    patients,
+    loading: patientsLoading,
+    error: patientsError,
+    createPatient,
+    updatePatient,
+    deletePatient,
+    setPatients,
+  } = usePatients({
+    onSuccess: () => {
+      console.log('✅ PatientsPage: Patient operation success')
+      setShowAddForm(false)
+      setEditingPatient(null)
+      form.resetForm()
+    },
+  })
+
+  console.log('👥 PatientsPage: Patients state:', {
+    patientsCount: patients.length,
+    patientsLoading,
+    patientsError
+  })
+
+  // Form management
+  const form = usePatientForm()
+
+  // UI state
   const [showAddForm, setShowAddForm] = useState(false)
   const [editingPatient, setEditingPatient] = useState<Patient | null>(null)
   const [deletingPatient, setDeletingPatient] = useState<Patient | null>(null)
-  const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
-    middleName: '',
-    dateOfBirth: '',
-    gender: '',
-    phone: '',
-    email: '',
-    address: '',
-    emergencyContact: '',
-    bloodType: '',
-    allergies: '',
-    medicalHistory: '',
-    nationality: '',
-    idNumber: '',
-    passportNumber: '',
-    city: '',
-    insuranceNumber: '',
-    insuranceCompany: '',
-    maritalStatus: '',
-    occupation: '',
-    notes: '',
-    hospitalId: ''
-  })
+  const [patientImages, setPatientImages] = useState<Array<{
+    id?: string
+    imageUrl: string
+    title?: string
+    description?: string
+    type?: string
+  }>>([])
 
-  const {
-    data: patients,
-    loading,
-    create,
-    update,
-    delete: deletePatient,
-    fetch
-  } = useCrud<Patient>({
-    endpoint: '/api/patients',
-    onSuccess: () => {
-      setShowAddForm(false)
-      setEditingPatient(null)
-      setFormData({
-        firstName: '', lastName: '', middleName: '', dateOfBirth: '', gender: '',
-        phone: '', email: '', address: '', emergencyContact: '', bloodType: '',
-        allergies: '', medicalHistory: '', nationality: '', idNumber: '',
-        passportNumber: '', city: '', insuranceNumber: '', insuranceCompany: '',
-        maritalStatus: '', occupation: '', notes: '', hospitalId: ''
-      })
-    }
-  })
-
+  // Debug: Log when patients change
   useEffect(() => {
-    fetchHospitals()
-    fetch()
-  }, [])
+    console.log('🔄 PatientsPage: DataPatients updated:', {
+      count: dataPatients.length,
+      patients: dataPatients.map(p => ({ id: p.id, name: `${p.firstName} ${p.lastName}`, number: p.patientNumber }))
+    })
+  }, [dataPatients])
 
-  const fetchHospitals = async () => {
-    try {
-      const response = await (globalThis as any).fetch('/api/hospitals')
-      const data = await response.json()
-      setHospitals(data)
-    } catch (error) {
-      console.error('خطأ في جلب المستشفيات:', error)
-    }
+  const handleCityChange = (cityId: string) => {
+    form.handleCityChange(cityId, hospitals)
+  }
+
+  const handleHospitalChange = (hospitalId: string) => {
+    form.handleHospitalChange(hospitalId, doctors)
   }
 
   const handleAdd = () => {
     setEditingPatient(null)
-    setFormData({
-      firstName: '', lastName: '', middleName: '', dateOfBirth: '', gender: '',
-      phone: '', email: '', address: '', emergencyContact: '', bloodType: '',
-      allergies: '', medicalHistory: '', nationality: '', idNumber: '',
-      passportNumber: '', city: '', insuranceNumber: '', insuranceCompany: '',
-      maritalStatus: '', occupation: '', notes: '', hospitalId: ''
-    })
+    form.resetForm()
+    setPatientImages([])
     setShowAddForm(true)
   }
 
   const handleEdit = (patient: Patient) => {
     setEditingPatient(patient)
-    setFormData({
-      firstName: patient.firstName,
-      lastName: patient.lastName,
-      middleName: patient.middleName || '',
-      dateOfBirth: patient.dateOfBirth.split('T')[0],
-      gender: patient.gender,
-      phone: patient.phone,
-      email: patient.email || '',
-      address: patient.address,
-      emergencyContact: patient.emergencyContact,
-      bloodType: patient.bloodType,
-      allergies: patient.allergies?.join(', ') || '',
-      medicalHistory: patient.medicalHistory || '',
-      nationality: patient.nationality || '',
-      idNumber: patient.idNumber || '',
-      passportNumber: patient.passportNumber || '',
-      city: patient.city || '',
-      insuranceNumber: patient.insuranceNumber || '',
-      insuranceCompany: patient.insuranceCompany || '',
-      maritalStatus: patient.maritalStatus || '',
-      occupation: patient.occupation || '',
-      notes: patient.notes || '',
-      hospitalId: patient.hospitalId
-    })
+    form.populateForm(patient)
     setShowAddForm(true)
   }
 
@@ -175,16 +115,12 @@ export default function PatientsPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    const allergies = formData.allergies ? formData.allergies.split(',').map(a => a.trim()).filter(a => a) : []
-    const patientData = {
-      ...formData,
-      allergies: allergies.length > 0 ? allergies : undefined
-    }
+    const patientData = form.preparePatientData(form.formData)
 
     if (editingPatient) {
-      await update(editingPatient.id, patientData)
+      await updatePatient(editingPatient.id, patientData)
     } else {
-      await create(patientData)
+      await createPatient(patientData)
     }
   }
 
@@ -279,11 +215,33 @@ export default function PatientsPage() {
     }
   ]
 
+  if (dataLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-lg">جاري التحميل...</div>
+      </div>
+    )
+  }
+
+  if (dataError) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-lg text-red-600">خطأ في تحميل البيانات: {dataError}</div>
+      </div>
+    )
+  }
+
+  console.log('🎯 PatientsPage: Rendering UniversalTable with:', {
+    patientsCount: dataPatients.length,
+    dataLoading,
+    patients: dataPatients.slice(0, 2) // Show first 2 patients for debugging
+  })
+
   return (
     <div className="space-y-6">
       <UniversalTable
         title="إدارة المرضى"
-        data={patients}
+        data={dataPatients}
         columns={columns}
         searchFields={['firstName', 'lastName', 'patientNumber', 'phone', 'email']}
         filters={filters}
@@ -292,7 +250,7 @@ export default function PatientsPage() {
         onDelete={handleDelete}
         addButtonText="إضافة مريض جديد"
         emptyMessage="لا توجد مرضى مسجلين"
-        loading={loading}
+        loading={dataLoading}
         itemsPerPage={30}
       />
 
@@ -310,22 +268,22 @@ export default function PatientsPage() {
           <FormGrid cols={3}>
             <FormField label="الاسم الأول" required>
               <TextInput
-                value={formData.firstName}
-                onChange={(value) => setFormData({ ...formData, firstName: value })}
+                value={form.formData.firstName}
+                onChange={(value) => form.setFormData({ ...form.formData, firstName: value })}
                 placeholder="الاسم الأول"
               />
             </FormField>
             <FormField label="الاسم الأخير" required>
               <TextInput
-                value={formData.lastName}
-                onChange={(value) => setFormData({ ...formData, lastName: value })}
+                value={form.formData.lastName}
+                onChange={(value) => form.setFormData({ ...form.formData, lastName: value })}
                 placeholder="الاسم الأخير"
               />
             </FormField>
             <FormField label="الاسم الأوسط">
               <TextInput
-                value={formData.middleName}
-                onChange={(value) => setFormData({ ...formData, middleName: value })}
+                value={form.formData.middleName}
+                onChange={(value) => form.setFormData({ ...form.formData, middleName: value })}
                 placeholder="الاسم الأوسط"
               />
             </FormField>
@@ -334,22 +292,22 @@ export default function PatientsPage() {
             <FormField label="تاريخ الميلاد" required>
               <TextInput
                 type="date"
-                value={formData.dateOfBirth}
-                onChange={(value) => setFormData({ ...formData, dateOfBirth: value })}
+                value={form.formData.dateOfBirth}
+                onChange={(value) => form.setFormData({ ...form.formData, dateOfBirth: value })}
               />
             </FormField>
             <FormField label="الجنس" required>
               <SelectInput
-                value={formData.gender}
-                onChange={(value) => setFormData({ ...formData, gender: value })}
+                value={form.formData.gender}
+                onChange={(value) => form.setFormData({ ...form.formData, gender: value })}
                 placeholder="اختر الجنس"
                 options={genders.map(g => ({ value: g, label: g }))}
               />
             </FormField>
             <FormField label="فصيلة الدم">
               <SelectInput
-                value={formData.bloodType}
-                onChange={(value) => setFormData({ ...formData, bloodType: value })}
+                value={form.formData.bloodType}
+                onChange={(value) => form.setFormData({ ...form.formData, bloodType: value })}
                 placeholder="اختر فصيلة الدم"
                 options={bloodTypes.map(t => ({ value: t, label: t }))}
               />
@@ -362,16 +320,16 @@ export default function PatientsPage() {
           <FormGrid cols={2}>
             <FormField label="رقم الهاتف" required>
               <TextInput
-                value={formData.phone}
-                onChange={(value) => setFormData({ ...formData, phone: value })}
+                value={form.formData.phone}
+                onChange={(value) => form.setFormData({ ...form.formData, phone: value })}
                 placeholder="رقم الهاتف"
               />
             </FormField>
             <FormField label="البريد الإلكتروني">
               <TextInput
                 type="email"
-                value={formData.email}
-                onChange={(value) => setFormData({ ...formData, email: value })}
+                value={form.formData.email}
+                onChange={(value) => form.setFormData({ ...form.formData, email: value })}
                 placeholder="البريد الإلكتروني"
               />
             </FormField>
@@ -379,15 +337,15 @@ export default function PatientsPage() {
           <FormGrid cols={2}>
             <FormField label="العنوان" required>
               <TextInput
-                value={formData.address}
-                onChange={(value) => setFormData({ ...formData, address: value })}
+                value={form.formData.address}
+                onChange={(value) => form.setFormData({ ...form.formData, address: value })}
                 placeholder="العنوان"
               />
             </FormField>
             <FormField label="رقم الطوارئ" required>
               <TextInput
-                value={formData.emergencyContact}
-                onChange={(value) => setFormData({ ...formData, emergencyContact: value })}
+                value={form.formData.emergencyContact}
+                onChange={(value) => form.setFormData({ ...form.formData, emergencyContact: value })}
                 placeholder="رقم الطوارئ"
               />
             </FormField>
@@ -399,51 +357,88 @@ export default function PatientsPage() {
           <FormGrid cols={2}>
             <FormField label="الحساسية">
               <TextInput
-                value={formData.allergies}
-                onChange={(value) => setFormData({ ...formData, allergies: value })}
+                value={form.formData.allergies}
+                onChange={(value) => form.setFormData({ ...form.formData, allergies: value })}
                 placeholder="الحساسية (مفصولة بفواصل)"
+              />
+            </FormField>
+            <FormField label="المدينة" required>
+              <SelectInput
+                value={form.selectedCityId}
+                onChange={handleCityChange}
+                placeholder={dataLoading ? "جاري التحميل..." : "اختر المدينة أولاً"}
+                options={cities.map(c => ({ value: c.id, label: c.name }))}
+                disabled={dataLoading}
               />
             </FormField>
             <FormField label="المستشفى" required>
               <SelectInput
-                value={formData.hospitalId}
-                onChange={(value) => setFormData({ ...formData, hospitalId: value })}
-                placeholder="اختر المستشفى"
-                options={hospitals.map(h => ({ value: h.id, label: `${h.name} - ${h.city.name}` }))}
+                value={form.selectedHospitalId}
+                onChange={handleHospitalChange}
+                placeholder={dataLoading ? "جاري التحميل..." : (form.selectedCityId ? "اختر المستشفى" : "اختر المدينة أولاً")}
+                options={form.filteredHospitals.map(h => ({ value: h.id, label: h.name }))}
+                disabled={!form.selectedCityId || dataLoading}
+              />
+            </FormField>
+            <FormField label="الطبيب" required>
+              <SelectInput
+                value={form.formData.doctorId}
+                onChange={(value) => form.setFormData({ ...form.formData, doctorId: value })}
+                placeholder={dataLoading ? "جاري التحميل..." : (form.selectedHospitalId ? "اختر الطبيب" : "اختر المستشفى أولاً")}
+                options={form.filteredDoctors.map(d => ({ value: d.id, label: `${d.firstName} ${d.lastName} - ${d.specialization}` }))}
+                disabled={!form.selectedHospitalId || dataLoading}
               />
             </FormField>
           </FormGrid>
           <FormField label="التاريخ الطبي">
             <TextArea
-              value={formData.medicalHistory}
-              onChange={(value) => setFormData({ ...formData, medicalHistory: value })}
+              value={form.formData.medicalHistory}
+              onChange={(value) => form.setFormData({ ...form.formData, medicalHistory: value })}
               placeholder="التاريخ الطبي السابق"
             />
           </FormField>
         </FormSection>
+
+        {/* Patient Images */}
+        <FormSection title="صور المريض">
+          <ImageUpload
+            images={patientImages}
+            onImagesChange={setPatientImages}
+            maxImages={10}
+            className="w-full"
+          />
+        </FormSection>
+
+        {/* Loading State */}
+        {dataLoading && (
+          <div className="text-center py-4">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <p className="mt-2 text-sm text-gray-600">جاري تحميل البيانات...</p>
+          </div>
+        )}
 
         {/* Additional Information */}
         <FormSection title="معلومات إضافية">
           <FormGrid cols={3}>
             <FormField label="الجنسية">
               <SelectInput
-                value={formData.nationality}
-                onChange={(value) => setFormData({ ...formData, nationality: value })}
+                value={form.formData.nationality}
+                onChange={(value) => form.setFormData({ ...form.formData, nationality: value })}
                 placeholder="اختر الجنسية"
                 options={nationalities.map(n => ({ value: n, label: n }))}
               />
             </FormField>
             <FormField label="رقم الهوية">
               <TextInput
-                value={formData.idNumber}
-                onChange={(value) => setFormData({ ...formData, idNumber: value })}
+                value={form.formData.idNumber}
+                onChange={(value) => form.setFormData({ ...form.formData, idNumber: value })}
                 placeholder="رقم الهوية"
               />
             </FormField>
             <FormField label="رقم جواز السفر">
               <TextInput
-                value={formData.passportNumber}
-                onChange={(value) => setFormData({ ...formData, passportNumber: value })}
+                value={form.formData.passportNumber}
+                onChange={(value) => form.setFormData({ ...form.formData, passportNumber: value })}
                 placeholder="رقم جواز السفر"
               />
             </FormField>
@@ -451,47 +446,48 @@ export default function PatientsPage() {
           <FormGrid cols={3}>
             <FormField label="الحالة الاجتماعية">
               <SelectInput
-                value={formData.maritalStatus}
-                onChange={(value) => setFormData({ ...formData, maritalStatus: value })}
+                value={form.formData.maritalStatus}
+                onChange={(value) => form.setFormData({ ...form.formData, maritalStatus: value })}
                 placeholder="اختر الحالة الاجتماعية"
                 options={maritalStatuses.map(s => ({ value: s, label: s }))}
               />
             </FormField>
             <FormField label="المهنة">
               <TextInput
-                value={formData.occupation}
-                onChange={(value) => setFormData({ ...formData, occupation: value })}
+                value={form.formData.occupation}
+                onChange={(value) => form.setFormData({ ...form.formData, occupation: value })}
                 placeholder="المهنة"
               />
             </FormField>
             <FormField label="المدينة">
               <TextInput
-                value={formData.city}
-                onChange={(value) => setFormData({ ...formData, city: value })}
+                value={cities.find(c => c.id === form.formData.cityId)?.name || ''}
+                onChange={() => {}} // Read-only, city is selected via dropdown
                 placeholder="المدينة"
+                disabled
               />
             </FormField>
           </FormGrid>
           <FormGrid cols={2}>
             <FormField label="رقم التأمين">
               <TextInput
-                value={formData.insuranceNumber}
-                onChange={(value) => setFormData({ ...formData, insuranceNumber: value })}
+                value={form.formData.insuranceNumber}
+                onChange={(value) => form.setFormData({ ...form.formData, insuranceNumber: value })}
                 placeholder="رقم التأمين"
               />
             </FormField>
             <FormField label="شركة التأمين">
               <TextInput
-                value={formData.insuranceCompany}
-                onChange={(value) => setFormData({ ...formData, insuranceCompany: value })}
+                value={form.formData.insuranceCompany}
+                onChange={(value) => form.setFormData({ ...form.formData, insuranceCompany: value })}
                 placeholder="شركة التأمين"
               />
             </FormField>
           </FormGrid>
           <FormField label="ملاحظات">
             <TextArea
-              value={formData.notes}
-              onChange={(value) => setFormData({ ...formData, notes: value })}
+              value={form.formData.notes}
+              onChange={(value) => form.setFormData({ ...form.formData, notes: value })}
               placeholder="ملاحظات إضافية"
             />
           </FormField>

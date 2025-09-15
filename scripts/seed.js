@@ -7,43 +7,24 @@ async function main() {
 
   // Create cities
   const city1 = await prisma.city.upsert({
-    where: { name: 'New York' },
+    where: { name: 'بغداد' },
     update: {},
-    create: { name: 'New York' },
+    create: { name: 'بغداد' },
   });
 
   const city2 = await prisma.city.upsert({
-    where: { name: 'Los Angeles' },
+    where: { name: 'البصرة' },
     update: {},
-    create: { name: 'Los Angeles' },
+    create: { name: 'البصرة' },
+  });
+
+  const city3 = await prisma.city.upsert({
+    where: { name: 'أربيل' },
+    update: {},
+    create: { name: 'أربيل' },
   });
 
   console.log('✅ Cities created');
-
-  // Create centers
-  const center1 = await prisma.center.upsert({
-    where: { id: 'center-1' },
-    update: {},
-    create: {
-      id: 'center-1',
-      name: 'Manhattan Medical Center',
-      address: '123 Medical Plaza, Manhattan, NY',
-      cityId: city1.id,
-    },
-  });
-
-  const center2 = await prisma.center.upsert({
-    where: { id: 'center-2' },
-    update: {},
-    create: {
-      id: 'center-2',
-      name: 'LA Healthcare Complex',
-      address: '456 Health Street, Los Angeles, CA',
-      cityId: city2.id,
-    },
-  });
-
-  console.log('✅ Centers created');
 
   // Create hospitals
   const hospital1 = await prisma.hospital.upsert({
@@ -51,11 +32,11 @@ async function main() {
     update: {},
     create: {
       id: 'hospital-1',
-      name: 'General Hospital NYC',
-      address: '789 Hospital Ave, Manhattan, NY',
-      phone: '+1-555-0101',
-      email: 'info@generalhospitalnyc.com',
-      centerId: center1.id,
+      name: 'مستشفى بغداد التعليمي',
+      address: 'شارع الرشيد، بغداد، العراق',
+      phone: '+964-1-234-5678',
+      email: 'info@baghdadhospital.edu.iq',
+      cityId: city1.id,
     },
   });
 
@@ -64,11 +45,24 @@ async function main() {
     update: {},
     create: {
       id: 'hospital-2',
-      name: 'City Medical Center LA',
-      address: '321 Medical Blvd, Los Angeles, CA',
-      phone: '+1-555-0202',
-      email: 'contact@citymedicalla.com',
-      centerId: center2.id,
+      name: 'مستشفى البصرة العام',
+      address: 'شارع الكورنيش، البصرة، العراق',
+      phone: '+964-40-123-4567',
+      email: 'info@basrahhospital.gov.iq',
+      cityId: city2.id,
+    },
+  });
+
+  const hospital3 = await prisma.hospital.upsert({
+    where: { id: 'hospital-3' },
+    update: {},
+    create: {
+      id: 'hospital-3',
+      name: 'مستشفى أربيل الطبي',
+      address: 'شارع 60 متر، أربيل، كردستان العراق',
+      phone: '+964-66-123-4567',
+      email: 'info@erbilmedical.com',
+      cityId: city3.id,
     },
   });
 
@@ -149,18 +143,20 @@ async function main() {
     update: {},
     create: {
       id: 'patient-1',
+      patientNumber: 'P001',
+      cityId: city1.id,
       hospitalId: hospital1.id,
-      firstName: 'Alice',
-      lastName: 'Johnson',
+      firstName: 'أحمد',
+      lastName: 'محمد',
       dateOfBirth: new Date('1985-03-15'),
-      gender: 'female',
-      phone: '+1-555-0505',
-      email: 'alice.johnson@email.com',
-      address: '123 Main St, New York, NY',
-      emergencyContact: '+1-555-0506',
+      gender: 'male',
+      phone: '+964-770-123-4567',
+      email: 'ahmed.mohammed@email.com',
+      address: 'شارع الرشيد، بغداد، العراق',
+      emergencyContact: '+964-770-123-4568',
       bloodType: 'A+',
-      allergies: 'Penicillin',
-      medicalHistory: 'No significant medical history',
+      allergies: 'البنسلين',
+      medicalHistory: 'لا يوجد تاريخ مرضي مهم',
     },
   });
 
@@ -169,18 +165,20 @@ async function main() {
     update: {},
     create: {
       id: 'patient-2',
-      hospitalId: hospital1.id,
-      firstName: 'Bob',
-      lastName: 'Wilson',
+      patientNumber: 'P002',
+      cityId: city2.id,
+      hospitalId: hospital2.id,
+      firstName: 'فاطمة',
+      lastName: 'علي',
       dateOfBirth: new Date('1978-07-22'),
-      gender: 'male',
-      phone: '+1-555-0606',
-      email: 'bob.wilson@email.com',
-      address: '456 Oak Ave, New York, NY',
-      emergencyContact: '+1-555-0607',
+      gender: 'female',
+      phone: '+964-770-234-5678',
+      email: 'fatima.ali@email.com',
+      address: 'شارع الكورنيش، البصرة، العراق',
+      emergencyContact: '+964-770-234-5679',
       bloodType: 'O-',
-      allergies: 'None',
-      medicalHistory: 'Previous heart surgery in 2020',
+      allergies: 'لا يوجد',
+      medicalHistory: 'جراحة قلب سابقة في 2020',
     },
   });
 

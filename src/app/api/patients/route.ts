@@ -21,7 +21,15 @@ export async function GET() {
       }
     })
 
-    return NextResponse.json(patients)
+    return NextResponse.json({
+      data: patients,
+      pagination: {
+        page: 1,
+        limit: patients.length,
+        total: patients.length,
+        totalPages: 1
+      }
+    })
   } catch (error) {
     console.error('خطأ في جلب المرضى:', error)
     return NextResponse.json(
@@ -49,7 +57,7 @@ export async function POST(request: NextRequest) {
       nationality,
       idNumber,
       passportNumber,
-      city,
+      cityId,
       insuranceNumber,
       insuranceCompany,
       maritalStatus,
@@ -58,9 +66,21 @@ export async function POST(request: NextRequest) {
       hospitalId
     } = await request.json()
 
-    if (!firstName || !lastName || !dateOfBirth || !gender || !phone || !address || !emergencyContact || !hospitalId) {
+    if (!firstName || !lastName || !dateOfBirth || !gender || !phone || !address || !emergencyContact || !cityId || !hospitalId) {
       return NextResponse.json(
         { error: 'جميع الحقول المطلوبة يجب ملؤها' },
+        { status: 400 }
+      )
+    }
+
+    // Check if city exists
+    const city = await prisma.city.findUnique({
+      where: { id: cityId }
+    })
+
+    if (!city) {
+      return NextResponse.json(
+        { error: 'المدينة المحددة غير موجودة' },
         { status: 400 }
       )
     }
@@ -77,11 +97,44 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Generate patient number
-    const patientCount = await prisma.patient.count({
-      where: { hospitalId }
-    })
-    const patientNumber = `P${hospitalId.slice(-4)}${String(patientCount + 1).padStart(3, '0')}`
+    // Verify hospital belongs to the selected city
+    if (hospital.cityId !== cityId) {
+      return NextResponse.json(
+        { error: 'المستشفى المحدد لا ينتمي للمدينة المحددة' },
+        { status: 400 }
+      )
+    }
+
+    // Generate unique patient number
+    let patientNumber: string = ''
+    let isUnique = false
+    let attempts = 0
+    
+    while (!isUnique && attempts < 10) {
+      const patientCount = await prisma.patient.count({
+        where: { hospitalId }
+      })
+      const hospitalCode = hospitalId.slice(-4).toUpperCase()
+      const sequenceNumber = String(patientCount + 1 + attempts).padStart(4, '0')
+      patientNumber = `P${hospitalCode}${sequenceNumber}`
+      
+      // Check if this patient number already exists
+      const existingPatient = await prisma.patient.findUnique({
+        where: { patientNumber }
+      })
+      
+      if (!existingPatient) {
+        isUnique = true
+      }
+      attempts++
+    }
+    
+    if (!isUnique) {
+      return NextResponse.json(
+        { error: 'فشل في إنشاء رقم مريض فريد' },
+        { status: 500 }
+      )
+    }
 
     const patient = await prisma.patient.create({
       data: {
@@ -96,12 +149,12 @@ export async function POST(request: NextRequest) {
         address: address.trim(),
         emergencyContact: emergencyContact.trim(),
         bloodType: bloodType || null,
-        allergies: allergies || null,
+        allergies: Array.isArray(allergies) ? allergies.join(', ') : allergies || null,
         medicalHistory: medicalHistory?.trim() || null,
         nationality: nationality || null,
         idNumber: idNumber?.trim() || null,
         passportNumber: passportNumber?.trim() || null,
-        city: city?.trim() || null,
+        cityId,
         insuranceNumber: insuranceNumber?.trim() || null,
         insuranceCompany: insuranceCompany?.trim() || null,
         maritalStatus: maritalStatus || null,

@@ -1,78 +1,106 @@
 'use client'
 
-import { ReactNode } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
+import { Fragment } from 'react'
+import { Dialog, Transition } from '@headlessui/react'
 import { X } from 'lucide-react'
+import { Button } from './button'
 
 interface FormModalProps {
   isOpen: boolean
   onClose: () => void
   title: string
-  children: ReactNode
-  onSubmit?: (e: React.FormEvent) => void
+  onSubmit: (e: React.FormEvent) => void
   submitText?: string
-  cancelText?: string
+  children: React.ReactNode
+  size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl'
   loading?: boolean
-  size?: 'sm' | 'md' | 'lg' | 'xl'
+}
+
+const sizeClasses = {
+  sm: 'max-w-md',
+  md: 'max-w-lg',
+  lg: 'max-w-2xl',
+  xl: 'max-w-4xl',
+  '2xl': 'max-w-6xl'
 }
 
 export function FormModal({
   isOpen,
   onClose,
   title,
-  children,
   onSubmit,
   submitText = 'حفظ',
-  cancelText = 'إلغاء',
-  loading = false,
-  size = 'md'
+  children,
+  size = 'lg',
+  loading = false
 }: FormModalProps) {
-  if (!isOpen) return null
-
-  const sizeClasses = {
-    sm: 'max-w-md',
-    md: 'max-w-2xl',
-    lg: 'max-w-4xl',
-    xl: 'max-w-6xl'
-  }
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className={`w-full ${sizeClasses[size]} max-h-[90vh] overflow-y-auto`}>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-            <CardTitle className="text-xl font-semibold">{title}</CardTitle>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onClose}
-              className="h-8 w-8 p-0"
+    <Transition appear show={isOpen} as={Fragment}>
+      <Dialog as="div" className="relative z-50" onClose={onClose}>
+        <Transition.Child
+          as={Fragment}
+          enter="ease-out duration-300"
+          enterFrom="opacity-0"
+          enterTo="opacity-100"
+          leave="ease-in duration-200"
+          leaveFrom="opacity-100"
+          leaveTo="opacity-0"
+        >
+          <div className="fixed inset-0 bg-black bg-opacity-25" />
+        </Transition.Child>
+
+        <div className="fixed inset-0 overflow-y-auto">
+          <div className="flex min-h-full items-center justify-center p-4 text-center">
+            <Transition.Child
+              as={Fragment}
+              enter="ease-out duration-300"
+              enterFrom="opacity-0 scale-95"
+              enterTo="opacity-100 scale-100"
+              leave="ease-in duration-200"
+              leaveFrom="opacity-100 scale-100"
+              leaveTo="opacity-0 scale-95"
             >
-              <X className="h-4 w-4" />
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={onSubmit} className="space-y-6">
-              {children}
-              <div className="flex justify-end space-x-4 rtl:space-x-reverse pt-4 border-t">
-                <Button type="button" variant="outline" onClick={onClose}>
-                  {cancelText}
-                </Button>
-                {onSubmit && (
-                  <Button 
-                    type="submit" 
-                    className="bg-hospital-blue hover:bg-hospital-darkBlue"
-                    disabled={loading}
+              <Dialog.Panel className={`w-full ${sizeClasses[size]} transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all`}>
+                <div className="flex items-center justify-between mb-6">
+                  <Dialog.Title
+                    as="h3"
+                    className="text-lg font-medium leading-6 text-gray-900"
                   >
-                    {loading ? 'جاري الحفظ...' : submitText}
-                  </Button>
-                )}
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+                    {title}
+                  </Dialog.Title>
+                  <button
+                    type="button"
+                    className="rounded-md text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    onClick={onClose}
+                  >
+                    <X className="h-6 w-6" />
+                  </button>
+                </div>
+
+                <form onSubmit={onSubmit} className="space-y-6">
+                  {children}
+                  
+                  <div className="flex justify-end space-x-3 rtl:space-x-reverse pt-6 border-t">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={onClose}
+                    >
+                      إلغاء
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={loading}
+                    >
+                      {loading ? 'جاري الحفظ...' : submitText}
+                    </Button>
+                  </div>
+                </form>
+              </Dialog.Panel>
+            </Transition.Child>
+          </div>
+        </div>
+      </Dialog>
+    </Transition>
   )
 }

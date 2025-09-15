@@ -8,9 +8,15 @@ import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Plus, Search, Edit, Trash2, UserCheck, Phone, Mail, GraduationCap, Building } from 'lucide-react'
 
+interface City {
+  id: string
+  name: string
+}
+
 interface Hospital {
   id: string
   name: string
+  cityId: string
   city: {
     id: string
     name: string
@@ -52,7 +58,9 @@ const specializations = [
 
 export default function DoctorsPage() {
   const [doctors, setDoctors] = useState<Doctor[]>([])
+  const [cities, setCities] = useState<City[]>([])
   const [hospitals, setHospitals] = useState<Hospital[]>([])
+  const [filteredHospitals, setFilteredHospitals] = useState<Hospital[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [showAddForm, setShowAddForm] = useState(false)
@@ -73,16 +81,19 @@ export default function DoctorsPage() {
 
   const fetchData = async () => {
     try {
-      const [doctorsRes, hospitalsRes] = await Promise.all([
+      const [doctorsRes, citiesRes, hospitalsRes] = await Promise.all([
         fetch('/api/doctors'),
+        fetch('/api/cities'),
         fetch('/api/hospitals')
       ])
       
       const doctorsData = await doctorsRes.json()
+      const citiesData = await citiesRes.json()
       const hospitalsData = await hospitalsRes.json()
       
-      setDoctors(doctorsData)
-      setHospitals(hospitalsData)
+      setDoctors(doctorsData.data || doctorsData || [])
+      setCities(citiesData.data || citiesData || [])
+      setHospitals(hospitalsData.data || hospitalsData || [])
     } catch (error) {
       console.error('خطأ في جلب البيانات:', error)
     } finally {
@@ -90,9 +101,25 @@ export default function DoctorsPage() {
     }
   }
 
+  const [selectedCityId, setSelectedCityId] = useState('')
+
+  const handleCityChange = (cityId: string) => {
+    setSelectedCityId(cityId)
+    setFormData({ ...formData, hospitalId: '' })
+    const cityHospitals = hospitals.filter(hospital => hospital.cityId === cityId)
+    setFilteredHospitals(cityHospitals)
+  }
+
+  const handleOpenForm = () => {
+    setFormData({ firstName: '', lastName: '', specialization: '', phone: '', licenseNumber: '', hospitalId: '', email: '', password: '' })
+    setSelectedCityId('')
+    setFilteredHospitals([])
+    setShowAddForm(true)
+  }
+
   const handleAddDoctor = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!formData.firstName.trim() || !formData.lastName.trim() || !formData.specialization || !formData.hospitalId || !formData.email.trim() || !formData.password.trim()) return
+    if (!formData.firstName.trim() || !formData.lastName.trim() || !formData.specialization || !selectedCityId || !formData.hospitalId || !formData.email.trim() || !formData.password.trim()) return
 
     try {
       const response = await fetch('/api/doctors', {
@@ -103,6 +130,8 @@ export default function DoctorsPage() {
 
       if (response.ok) {
         setFormData({ firstName: '', lastName: '', specialization: '', phone: '', licenseNumber: '', hospitalId: '', email: '', password: '' })
+        setSelectedCityId('')
+        setFilteredHospitals([])
         setShowAddForm(false)
         fetchData()
       }
@@ -127,12 +156,12 @@ export default function DoctorsPage() {
     }
   }
 
-  const filteredDoctors = doctors.filter(doctor =>
+  const filteredDoctors = Array.isArray(doctors) ? doctors.filter(doctor =>
     doctor.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
     doctor.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
     doctor.specialization.toLowerCase().includes(searchTerm.toLowerCase()) ||
     doctor.hospital.name.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  ) : []
 
   if (loading) {
     return (
@@ -146,7 +175,7 @@ export default function DoctorsPage() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold text-gray-900">إدارة الأطباء</h1>
-        <Button onClick={() => setShowAddForm(true)} className="bg-hospital-blue hover:bg-hospital-darkBlue">
+        <Button onClick={handleOpenForm} className="bg-hospital-blue hover:bg-hospital-darkBlue">
           <Plus className="ml-2 h-4 w-4" />
           إضافة طبيب جديد
         </Button>
@@ -194,15 +223,34 @@ export default function DoctorsPage() {
                   </Select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-2">المستشفى *</label>
-                  <Select value={formData.hospitalId} onValueChange={(value) => setFormData({ ...formData, hospitalId: value })}>
+                  <label className="block text-sm font-medium mb-2">المدينة *</label>
+                  <Select value={selectedCityId} onValueChange={handleCityChange}>
                     <SelectTrigger>
-                      <SelectValue placeholder="اختر المستشفى" />
+                      <SelectValue placeholder="اختر المدينة أولاً" />
                     </SelectTrigger>
                     <SelectContent>
-                      {hospitals.map((hospital) => (
+                      {cities.map((city) => (
+                        <SelectItem key={city.id} value={city.id}>
+                          {city.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">المستشفى *</label>
+                  <Select 
+                    value={formData.hospitalId} 
+                    onValueChange={(value) => setFormData({ ...formData, hospitalId: value })}
+                    disabled={!selectedCityId}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={selectedCityId ? "اختر المستشفى" : "اختر المدينة أولاً"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {filteredHospitals.map((hospital) => (
                         <SelectItem key={hospital.id} value={hospital.id}>
-                          {hospital.name} - {hospital.city.name}
+                          {hospital.name}
                         </SelectItem>
                       ))}
                     </SelectContent>

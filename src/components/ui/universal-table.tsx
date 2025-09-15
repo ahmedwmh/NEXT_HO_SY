@@ -43,7 +43,7 @@ interface UniversalTableProps<T> {
   data: T[]
   columns: Column<T>[]
   title: string
-  searchFields?: (keyof T)[]
+  searchFields?: (keyof T | string)[]
   filters?: FilterOption[]
   onAdd?: () => void
   onEdit?: (item: T) => void
@@ -59,6 +59,12 @@ interface UniversalTableProps<T> {
   showSearch?: boolean
   showFilters?: boolean
   showActions?: boolean
+  customActions?: (item: T) => Array<{
+    label: string
+    onClick: () => void
+    icon?: any
+    variant?: 'default' | 'outline' | 'secondary' | 'ghost' | 'link' | 'destructive'
+  }>
   className?: string
 }
 
@@ -82,6 +88,7 @@ export function UniversalTable<T extends Record<string, any>>({
   showSearch = true,
   showFilters = true,
   showActions = true,
+  customActions,
   className = ''
 }: UniversalTableProps<T>) {
   const [searchTerm, setSearchTerm] = useState('')
@@ -335,7 +342,7 @@ export function UniversalTable<T extends Record<string, any>>({
                         )}
                       </th>
                     ))}
-                    {showActions && (onEdit || onDelete || onView) && (
+                    {showActions && (onEdit || onDelete || onView || customActions) && (
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-32">
                         الإجراءات
                       </th>
@@ -358,38 +365,55 @@ export function UniversalTable<T extends Record<string, any>>({
                           }
                         </td>
                       ))}
-                      {showActions && (onEdit || onDelete || onView) && (
+                      {showActions && (onEdit || onDelete || onView || customActions) && (
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                           <div className="flex items-center space-x-2 rtl:space-x-reverse">
-                            {onView && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => onView(item)}
-                                className="text-blue-600 hover:text-blue-900"
-                              >
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                            )}
-                            {onEdit && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => onEdit(item)}
-                                className="text-green-600 hover:text-green-900"
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                            )}
-                            {onDelete && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => onDelete(item)}
-                                className="text-red-600 hover:text-red-900"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
+                            {customActions ? (
+                              customActions(item).map((action, actionIndex) => (
+                                <Button
+                                  key={actionIndex}
+                                  variant={action.variant || "outline"}
+                                  size="sm"
+                                  onClick={action.onClick}
+                                  className="text-blue-600 hover:text-blue-900"
+                                >
+                                  {action.icon && <action.icon className="h-4 w-4" />}
+                                  {action.label}
+                                </Button>
+                              ))
+                            ) : (
+                              <>
+                                {onView && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => onView(item)}
+                                    className="text-blue-600 hover:text-blue-900"
+                                  >
+                                    <Eye className="h-4 w-4" />
+                                  </Button>
+                                )}
+                                {onEdit && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => onEdit(item)}
+                                    className="text-green-600 hover:text-green-900"
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                )}
+                                {onDelete && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => onDelete(item)}
+                                    className="text-red-600 hover:text-red-900"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </>
                             )}
                           </div>
                         </td>

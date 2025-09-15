@@ -71,45 +71,50 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Create user first
-    const user = await prisma.user.create({
-      data: {
-        email,
-        password,
-        role: 'STAFF'
-      }
-    })
+    // Create user and staff in a transaction
+    const result = await prisma.$transaction(async (tx) => {
+      // Create user first
+      const user = await tx.user.create({
+        data: {
+          email,
+          password, // In production, hash this password
+          role: 'STAFF'
+        }
+      })
 
-    // Create staff
-    const staff = await prisma.staff.create({
-      data: {
-        userId: user.id,
-        hospitalId,
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
-        position,
-        phone: phone.trim()
-      },
-      include: {
-        hospital: {
-          include: {
-            city: {
-              select: {
-                id: true,
-                name: true
+      // Create staff profile linked to the user
+      const staff = await tx.staff.create({
+        data: {
+          userId: user.id,
+          hospitalId,
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+          position,
+          phone: phone.trim()
+        },
+        include: {
+          hospital: {
+            include: {
+              city: {
+                select: {
+                  id: true,
+                  name: true
+                }
               }
             }
-          }
-        },
-        user: {
-          select: {
-            email: true
+          },
+          user: {
+            select: {
+              email: true
+            }
           }
         }
-      }
+      })
+
+      return staff
     })
 
-    return NextResponse.json(staff, { status: 201 })
+    return NextResponse.json(result, { status: 201 })
   } catch (error) {
     console.error('خطأ في إنشاء الموظف:', error)
     

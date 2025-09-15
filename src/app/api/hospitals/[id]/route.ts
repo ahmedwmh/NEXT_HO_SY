@@ -1,41 +1,79 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const hospital = await prisma.hospital.findUnique({
+      where: { id: params.id },
+      include: {
+        city: {
+          select: {
+            id: true,
+            name: true
+          }
+        },
+        doctors: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            specialization: true
+          }
+        },
+        staff: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            position: true
+          }
+        },
+        patients: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            patientNumber: true
+          }
+        }
+      }
+    })
+
+    if (!hospital) {
+      return NextResponse.json(
+        { error: 'المستشفى غير موجود' },
+        { status: 404 }
+      )
+    }
+
+    return NextResponse.json(hospital)
+  } catch (error) {
+    console.error('خطأ في جلب بيانات المستشفى:', error)
+    return NextResponse.json(
+      { error: 'فشل في جلب بيانات المستشفى' },
+      { status: 500 }
+    )
+  }
+}
+
 export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const { name, address, phone, email, cityId } = await request.json()
-    const { id } = params
-
-    if (!name || !name.trim() || !address || !address.trim() || !cityId) {
-      return NextResponse.json(
-        { error: 'اسم المستشفى والعنوان والمدينة مطلوبة' },
-        { status: 400 }
-      )
-    }
-
-    // Check if city exists
-    const city = await prisma.city.findUnique({
-      where: { id: cityId }
-    })
-
-    if (!city) {
-      return NextResponse.json(
-        { error: 'المدينة المحددة غير موجودة' },
-        { status: 400 }
-      )
-    }
-
+    const data = await request.json()
+    
     const hospital = await prisma.hospital.update({
-      where: { id },
+      where: { id: params.id },
       data: {
-        name: name.trim(),
-        address: address.trim(),
-        phone: phone?.trim() || null,
-        email: email?.trim() || null,
-        cityId
+        name: data.name,
+        address: data.address,
+        phone: data.phone || null,
+        email: data.email || null,
+        cityId: data.cityId
       },
       include: {
         city: {
@@ -65,21 +103,6 @@ export async function PUT(
     return NextResponse.json(hospital)
   } catch (error) {
     console.error('خطأ في تحديث المستشفى:', error)
-    
-    if ((error as any).code === 'P2025') {
-      return NextResponse.json(
-        { error: 'المستشفى غير موجود' },
-        { status: 404 }
-      )
-    }
-
-    if ((error as any).code === 'P2002') {
-      return NextResponse.json(
-        { error: 'هذا المستشفى موجود بالفعل' },
-        { status: 409 }
-      )
-    }
-
     return NextResponse.json(
       { error: 'فشل في تحديث المستشفى' },
       { status: 500 }
@@ -92,13 +115,11 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const { id } = params
-
     // Check if hospital has doctors, staff, or patients
     const [doctorsCount, staffCount, patientsCount] = await Promise.all([
-      prisma.doctor.count({ where: { hospitalId: id } }),
-      prisma.staff.count({ where: { hospitalId: id } }),
-      prisma.patient.count({ where: { hospitalId: id } })
+      prisma.doctor.count({ where: { hospitalId: params.id } }),
+      prisma.staff.count({ where: { hospitalId: params.id } }),
+      prisma.patient.count({ where: { hospitalId: params.id } })
     ])
 
     if (doctorsCount > 0 || staffCount > 0 || patientsCount > 0) {
@@ -109,20 +130,12 @@ export async function DELETE(
     }
 
     await prisma.hospital.delete({
-      where: { id }
+      where: { id: params.id }
     })
 
     return NextResponse.json({ message: 'تم حذف المستشفى بنجاح' })
   } catch (error) {
     console.error('خطأ في حذف المستشفى:', error)
-    
-    if ((error as any).code === 'P2025') {
-      return NextResponse.json(
-        { error: 'المستشفى غير موجود' },
-        { status: 404 }
-      )
-    }
-
     return NextResponse.json(
       { error: 'فشل في حذف المستشفى' },
       { status: 500 }

@@ -8,7 +8,8 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DIRECT_DATABASE_URL")
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 enum UserRole {
@@ -22,6 +23,7 @@ enum VisitStatus {
   IN_PROGRESS
   COMPLETED
   CANCELLED
+  DRAFT
 }
 
 enum TestStatus {
@@ -121,6 +123,7 @@ model Doctor {
   tests     Test[]
   treatments Treatment[]
   operations Operation[]
+  medications Medication[]
   prescriptions Prescription[]
 
   @@index([hospitalId])
@@ -166,13 +169,12 @@ model Patient {
   phone           String?
   email           String?
   address         String?
-  city            String?   // المدينة
   emergencyContact String?
   emergencyPhone  String?   // رقم الطوارئ
   bloodType       String?
   allergies       String?
   medicalHistory  String?
-  profilePhoto    String?   // صورة المريض
+  profilePhoto    String?   // صورة المريض الرئيسية
   insuranceNumber String?   // رقم التأمين
   insuranceCompany String?  // شركة التأمين
   maritalStatus   String?   // الحالة الاجتماعية
@@ -190,8 +192,10 @@ model Patient {
   treatments  Treatment[]
   operations  Operation[]
   diseases    Disease[]
+  medications Medication[]
   attachments Attachment[]
   prescriptions Prescription[]
+  images      PatientImage[] // صور إضافية للمريض
 
   @@index([cityId])
   @@index([hospitalId])
@@ -207,8 +211,8 @@ model Patient {
 model Visit {
   id          String      @id @default(cuid())
   patientId   String
-  doctorId    String
-  hospitalId  String
+  doctorId    String?
+  hospitalId  String?
   scheduledAt DateTime
   status      VisitStatus @default(SCHEDULED)
   notes       String?
@@ -221,14 +225,19 @@ model Visit {
   heartRate   String?     // معدل النبض
   weight      String?     // الوزن
   height      String?     // الطول
+  images      String[]    // صور الكشف
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
   // Relations
   patient  Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  doctor   Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
-  hospital Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  doctor   Doctor?  @relation(fields: [doctorId], references: [id], onDelete: SetNull)
+  hospital Hospital? @relation(fields: [hospitalId], references: [id], onDelete: SetNull)
   prescriptions Prescription[]
+  tests    Test[]   // Tests related to this visit
+  treatments Treatment[] // Treatments related to this visit
+  operations Operation[] // Operations related to this visit
+  medications Medication[] // Medications prescribed in this visit
 
   @@index([patientId])
   @@index([doctorId])
@@ -244,12 +253,14 @@ model Test {
   patientId   String
   doctorId    String
   hospitalId  String
+  visitId     String?    // Optional visit relationship
   name        String
   description String?
   scheduledAt DateTime
   status      TestStatus @default(SCHEDULED)
   results     String?
   notes       String?
+  images      String[]   // صور الفحص
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 
@@ -257,10 +268,12 @@ model Test {
   patient  Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
   doctor   Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
   hospital Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  visit    Visit?   @relation(fields: [visitId], references: [id], onDelete: SetNull)
 
   @@index([patientId])
   @@index([doctorId])
   @@index([hospitalId])
+  @@index([visitId])
   @@index([scheduledAt])
   @@index([status])
   @@index([name])
@@ -272,11 +285,13 @@ model Treatment {
   patientId   String
   doctorId    String
   hospitalId  String
+  visitId     String?         // Optional visit relationship
   name        String
   description String?
   scheduledAt DateTime
   status      TreatmentStatus @default(SCHEDULED)
   notes       String?
+  images      String[]        // صور العلاج
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
@@ -284,10 +299,12 @@ model Treatment {
   patient  Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
   doctor   Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
   hospital Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  visit    Visit?   @relation(fields: [visitId], references: [id], onDelete: SetNull)
 
   @@index([patientId])
   @@index([doctorId])
   @@index([hospitalId])
+  @@index([visitId])
   @@index([scheduledAt])
   @@index([status])
   @@index([name])
@@ -299,11 +316,13 @@ model Operation {
   patientId   String
   doctorId    String
   hospitalId  String
+  visitId     String?         // Optional visit relationship
   name        String
   description String?
   scheduledAt DateTime
   status      OperationStatus @default(SCHEDULED)
   notes       String?
+  images      String[]        // صور العملية
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
@@ -311,10 +330,12 @@ model Operation {
   patient  Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
   doctor   Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
   hospital Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  visit    Visit?   @relation(fields: [visitId], references: [id], onDelete: SetNull)
 
   @@index([patientId])
   @@index([doctorId])
   @@index([hospitalId])
+  @@index([visitId])
   @@index([scheduledAt])
   @@index([status])
   @@index([name])
@@ -341,6 +362,57 @@ model Disease {
   @@index([diagnosedAt])
   @@index([status])
   @@map("diseases")
+}
+
+model Medication {
+  id          String   @id @default(cuid())
+  patientId   String
+  doctorId    String
+  visitId     String?  // Optional visit relationship
+  name        String
+  dosage      String?  // الجرعة
+  frequency   String?  // التكرار
+  duration    String?  // المدة
+  instructions String? // التعليمات
+  startDate   DateTime
+  endDate     DateTime?
+  status      String?  // Active, Completed, Discontinued
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  doctor  Doctor  @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  visit   Visit?  @relation(fields: [visitId], references: [id], onDelete: SetNull)
+
+  @@index([patientId])
+  @@index([doctorId])
+  @@index([visitId])
+  @@index([name])
+  @@index([startDate])
+  @@index([status])
+  @@map("medications")
+}
+
+model PatientImage {
+  id        String   @id @default(cuid())
+  patientId String
+  imageUrl  String   // رابط الصورة
+  title     String?  // عنوان الصورة
+  description String? // وصف الصورة
+  type      String?  // نوع الصورة (profile, document, medical, etc.)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
+  @@index([type])
+  @@index([isActive])
+  @@map("patient_images")
 }
 
 model Prescription {

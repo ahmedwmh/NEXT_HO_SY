@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { UniversalTable } from '@/components/ui/universal-table'
 import { Plus, Search, Edit, Trash2, Building, MapPin, Phone, Mail } from 'lucide-react'
 
 interface City {
@@ -33,6 +34,7 @@ export default function HospitalsPage() {
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [showAddForm, setShowAddForm] = useState(false)
+  const [editingHospital, setEditingHospital] = useState<Hospital | null>(null)
   const [formData, setFormData] = useState({
     name: '',
     address: '',
@@ -55,8 +57,8 @@ export default function HospitalsPage() {
       const hospitalsData = await hospitalsRes.json()
       const citiesData = await citiesRes.json()
       
-      setHospitals(hospitalsData)
-      setCities(citiesData)
+      setHospitals(hospitalsData.data || hospitalsData || [])
+      setCities(citiesData.data || citiesData || [])
     } catch (error) {
       console.error('خطأ في جلب البيانات:', error)
     } finally {
@@ -79,9 +81,39 @@ export default function HospitalsPage() {
         setFormData({ name: '', address: '', phone: '', email: '', cityId: '' })
         setShowAddForm(false)
         fetchData()
+      } else {
+        const error = await response.json()
+        alert(error.error || 'فشل في إضافة المستشفى')
       }
     } catch (error) {
       console.error('خطأ في إضافة المستشفى:', error)
+      alert('فشل في إضافة المستشفى')
+    }
+  }
+
+  const handleEditHospital = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingHospital || !formData.name.trim() || !formData.address.trim() || !formData.cityId) return
+
+    try {
+      const response = await fetch(`/api/hospitals/${editingHospital.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      })
+
+      if (response.ok) {
+        setFormData({ name: '', address: '', phone: '', email: '', cityId: '' })
+        setEditingHospital(null)
+        setShowAddForm(false)
+        fetchData()
+      } else {
+        const error = await response.json()
+        alert(error.error || 'فشل في تحديث المستشفى')
+      }
+    } catch (error) {
+      console.error('خطأ في تحديث المستشفى:', error)
+      alert('فشل في تحديث المستشفى')
     }
   }
 
@@ -95,10 +127,32 @@ export default function HospitalsPage() {
 
       if (response.ok) {
         fetchData()
+      } else {
+        const error = await response.json()
+        alert(error.error || 'فشل في حذف المستشفى')
       }
     } catch (error) {
       console.error('خطأ في حذف المستشفى:', error)
+      alert('فشل في حذف المستشفى')
     }
+  }
+
+  const handleEdit = (hospital: Hospital) => {
+    setEditingHospital(hospital)
+    setFormData({
+      name: hospital.name,
+      address: hospital.address,
+      phone: hospital.phone || '',
+      email: hospital.email || '',
+      cityId: hospital.cityId
+    })
+    setShowAddForm(true)
+  }
+
+  const handleCancel = () => {
+    setEditingHospital(null)
+    setFormData({ name: '', address: '', phone: '', email: '', cityId: '' })
+    setShowAddForm(false)
   }
 
   const filteredHospitals = hospitals.filter(hospital =>
@@ -114,23 +168,113 @@ export default function HospitalsPage() {
     )
   }
 
+  const columns = [
+    {
+      key: 'name',
+      label: 'اسم المستشفى',
+      sortable: true,
+      searchable: true,
+      render: (value: string, hospital: Hospital) => (
+        <div className="flex items-center space-x-3 rtl:space-x-reverse">
+          <Building className="h-5 w-5 text-hospital-blue" />
+          <span className="font-semibold">{hospital.name}</span>
+        </div>
+      )
+    },
+    {
+      key: 'city',
+      label: 'المدينة',
+      sortable: true,
+      render: (value: any, hospital: Hospital) => (
+        <div className="flex items-center text-sm text-gray-500">
+          <MapPin className="h-4 w-4 ml-1" />
+          {hospital.city.name}
+        </div>
+      )
+    },
+    {
+      key: 'address',
+      label: 'العنوان',
+      sortable: true,
+      render: (value: string) => (
+        <span className="text-sm text-gray-600">{value}</span>
+      )
+    },
+    {
+      key: 'phone',
+      label: 'الهاتف',
+      sortable: true,
+      render: (value: string | null) => (
+        value ? (
+          <div className="flex items-center text-sm text-gray-500">
+            <Phone className="h-4 w-4 ml-1" />
+            {value}
+          </div>
+        ) : '-'
+      )
+    },
+    {
+      key: 'doctors',
+      label: 'عدد الأطباء',
+      sortable: true,
+      render: (value: any[], hospital: Hospital) => (
+        <Badge variant="outline">
+          {hospital.doctors.length} طبيب
+        </Badge>
+      )
+    },
+    {
+      key: 'patients',
+      label: 'عدد المرضى',
+      sortable: true,
+      render: (value: any[], hospital: Hospital) => (
+        <Badge variant="outline">
+          {hospital.patients.length} مريض
+        </Badge>
+      )
+    }
+  ]
+
+  const filters = [
+    {
+      key: 'city',
+      label: 'المدينة',
+      type: 'select' as const,
+      options: cities.map(city => ({
+        value: city.id,
+        label: city.name
+      }))
+    }
+  ]
+
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-gray-900">إدارة المستشفيات</h1>
-        <Button onClick={() => setShowAddForm(true)} className="bg-hospital-blue hover:bg-hospital-darkBlue">
-          <Plus className="ml-2 h-4 w-4" />
-          إضافة مستشفى جديد
-        </Button>
-      </div>
+    <div className="w-full space-y-6">
+      <UniversalTable
+        title="إدارة المستشفيات"
+        data={hospitals}
+        columns={columns}
+        searchFields={['name', 'city.name']}
+        filters={filters}
+        onAdd={() => setShowAddForm(true)}
+        onEdit={handleEdit}
+        onDelete={(hospital: Hospital) => handleDeleteHospital(hospital.id)}
+        addButtonText="إضافة مستشفى جديد"
+        emptyMessage="لا توجد مستشفيات مسجلة"
+        loading={loading}
+        itemsPerPage={10}
+        showPagination={true}
+        showSearch={true}
+        showFilters={true}
+        showActions={true}
+      />
 
       {showAddForm && (
         <Card>
           <CardHeader>
-            <CardTitle>إضافة مستشفى جديد</CardTitle>
+            <CardTitle>{editingHospital ? 'تعديل المستشفى' : 'إضافة مستشفى جديد'}</CardTitle>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleAddHospital} className="space-y-4">
+            <form onSubmit={editingHospital ? handleEditHospital : handleAddHospital} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-2">اسم المستشفى *</label>
@@ -185,9 +329,9 @@ export default function HospitalsPage() {
               </div>
               <div className="flex gap-4">
                 <Button type="submit" className="bg-hospital-blue hover:bg-hospital-darkBlue">
-                  إضافة
+                  {editingHospital ? 'تحديث' : 'إضافة'}
                 </Button>
-                <Button type="button" variant="outline" onClick={() => setShowAddForm(false)}>
+                <Button type="button" variant="outline" onClick={handleCancel}>
                   إلغاء
                 </Button>
               </div>
@@ -196,94 +340,6 @@ export default function HospitalsPage() {
         </Card>
       )}
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>قائمة المستشفيات</CardTitle>
-            <div className="relative">
-              <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-              <Input
-                placeholder="البحث في المستشفيات..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pr-10 w-64"
-              />
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {filteredHospitals.map((hospital) => (
-              <Card key={hospital.id} className="hover:shadow-md transition-shadow">
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center space-x-3 rtl:space-x-reverse">
-                      <Building className="h-5 w-5 text-hospital-blue" />
-                      <div>
-                        <h3 className="font-semibold text-lg">{hospital.name}</h3>
-                        <div className="flex items-center text-sm text-gray-500">
-                          <MapPin className="h-4 w-4 ml-1" />
-                          {hospital.city.name}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex space-x-2 rtl:space-x-reverse">
-                      <Button size="sm" variant="outline">
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        variant="outline" 
-                        onClick={() => handleDeleteHospital(hospital.id)}
-                        className="text-red-600 hover:text-red-700"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-2 text-sm">
-                    <p className="text-gray-600">{hospital.address}</p>
-                    {hospital.phone && (
-                      <div className="flex items-center text-gray-500">
-                        <Phone className="h-4 w-4 ml-1" />
-                        {hospital.phone}
-                      </div>
-                    )}
-                    {hospital.email && (
-                      <div className="flex items-center text-gray-500">
-                        <Mail className="h-4 w-4 ml-1" />
-                        {hospital.email}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="mt-3 pt-3 border-t">
-                    <div className="flex justify-between text-sm">
-                      <div className="flex space-x-4 rtl:space-x-reverse">
-                        <span className="text-gray-500">
-                          <strong className="text-hospital-blue">{hospital.doctors.length}</strong> أطباء
-                        </span>
-                        <span className="text-gray-500">
-                          <strong className="text-hospital-blue">{hospital.staff.length}</strong> موظفين
-                        </span>
-                        <span className="text-gray-500">
-                          <strong className="text-hospital-blue">{hospital.patients.length}</strong> مرضى
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-          {filteredHospitals.length === 0 && (
-            <div className="text-center py-8 text-gray-500">
-              {searchTerm ? 'لم يتم العثور على مستشفيات تطابق البحث' : 'لا توجد مستشفيات مسجلة'}
-            </div>
-          )}
-        </CardContent>
-      </Card>
     </div>
   )
 }

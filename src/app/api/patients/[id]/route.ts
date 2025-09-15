@@ -9,14 +9,95 @@ export async function GET(
     const patient = await prisma.patient.findUnique({
       where: { id: params.id },
       include: {
+        city: {
+          select: {
+            id: true,
+            name: true
+          }
+        },
         hospital: {
+          select: {
+            id: true,
+            name: true
+          }
+        },
+        visits: {
           include: {
-            city: {
+            doctor: {
               select: {
-                id: true,
-                name: true
+                firstName: true,
+                lastName: true,
+                specialization: true
               }
             }
+          },
+          orderBy: {
+            scheduledAt: 'desc'
+          }
+        },
+        tests: {
+          include: {
+            doctor: {
+              select: {
+                firstName: true,
+                lastName: true
+              }
+            }
+          },
+          orderBy: {
+            scheduledAt: 'desc'
+          }
+        },
+        treatments: {
+          include: {
+            doctor: {
+              select: {
+                firstName: true,
+                lastName: true
+              }
+            }
+          },
+          orderBy: {
+            scheduledAt: 'desc'
+          }
+        },
+        operations: {
+          include: {
+            doctor: {
+              select: {
+                firstName: true,
+                lastName: true
+              }
+            }
+          },
+          orderBy: {
+            scheduledAt: 'desc'
+          }
+        },
+        medications: {
+          include: {
+            doctor: {
+              select: {
+                firstName: true,
+                lastName: true
+              }
+            }
+          },
+          orderBy: {
+            startDate: 'desc'
+          }
+        },
+        diseases: {
+          orderBy: {
+            diagnosedAt: 'desc'
+          }
+        },
+        images: {
+          where: {
+            isActive: true
+          },
+          orderBy: {
+            createdAt: 'desc'
           }
         }
       }
@@ -45,33 +126,78 @@ export async function PUT(
 ) {
   try {
     const data = await request.json()
-    
-    const patient = await prisma.patient.update({
+    const { cityId, hospitalId, ...patientData } = data
+
+    // Check if city exists
+    if (cityId) {
+      const city = await prisma.city.findUnique({
+        where: { id: cityId }
+      })
+      if (!city) {
+        return NextResponse.json(
+          { error: 'المدينة المحددة غير موجودة' },
+          { status: 400 }
+        )
+      }
+    }
+
+    // Check if hospital exists
+    if (hospitalId) {
+      const hospital = await prisma.hospital.findUnique({
+        where: { id: hospitalId }
+      })
+      if (!hospital) {
+        return NextResponse.json(
+          { error: 'المستشفى المحدد غير موجود' },
+          { status: 400 }
+        )
+      }
+    }
+
+    // Process allergies field if it's an array
+    const processedPatientData = {
+      ...patientData,
+      allergies: Array.isArray(patientData.allergies) 
+        ? patientData.allergies.join(', ') 
+        : patientData.allergies
+    }
+
+    const updatedPatient = await prisma.patient.update({
       where: { id: params.id },
       data: {
-        ...data,
-        dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : undefined,
-        allergies: data.allergies ? (Array.isArray(data.allergies) ? data.allergies : data.allergies.split(',').map((a: string) => a.trim()).filter((a: string) => a)) : undefined
+        ...processedPatientData,
+        cityId,
+        hospitalId
       },
       include: {
+        city: {
+          select: {
+            id: true,
+            name: true
+          }
+        },
         hospital: {
-          include: {
-            city: {
-              select: {
-                id: true,
-                name: true
-              }
-            }
+          select: {
+            id: true,
+            name: true
           }
         }
       }
     })
 
-    return NextResponse.json(patient)
+    return NextResponse.json(updatedPatient)
   } catch (error) {
-    console.error('خطأ في تحديث بيانات المريض:', error)
+    console.error('خطأ في تحديث المريض:', error)
+    
+    if ((error as any).code === 'P2002') {
+      return NextResponse.json(
+        { error: 'البيانات المدخلة موجودة بالفعل' },
+        { status: 409 }
+      )
+    }
+
     return NextResponse.json(
-      { error: 'فشل في تحديث بيانات المريض' },
+      { error: 'فشل في تحديث المريض' },
       { status: 500 }
     )
   }
