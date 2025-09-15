@@ -11,29 +11,13 @@ export async function uploadFile(
   bucket: string,
   path: string
 ): Promise<UploadResult> {
-  try {
-    const { data, error } = await supabaseAdmin.storage
-      .from(bucket)
-      .upload(path, file, {
-        cacheControl: '3600',
-        upsert: false,
-      })
-
-    if (error) {
-      throw new Error(`Upload failed: ${error.message}`)
-    }
-
-    const { data: { publicUrl } } = supabaseAdmin.storage
-      .from(bucket)
-      .getPublicUrl(data.path)
-
-    return {
-      url: publicUrl,
-      path: data.path,
-    }
-  } catch (error) {
-    console.error('Upload error:', error)
-    throw error
+  // File upload functionality is disabled as Supabase is not configured
+  // Return a placeholder URL for now
+  const placeholderUrl = `${process.env.SUPABASE_BUCKET_ENDPOINT || 'https://placeholder.com'}/${bucket}/${path}`
+  
+  return {
+    url: placeholderUrl,
+    path: path,
   }
 }
 
@@ -79,26 +63,14 @@ export async function uploadMedicalAttachment(
 }
 
 export async function deleteFile(bucket: string, path: string): Promise<void> {
-  try {
-    const { error } = await supabaseAdmin.storage
-      .from(bucket)
-      .remove([path])
-
-    if (error) {
-      throw new Error(`Delete failed: ${error.message}`)
-    }
-  } catch (error) {
-    console.error('Delete error:', error)
-    throw error
-  }
+  // File delete functionality is disabled as Supabase is not configured
+  console.log(`File delete requested for ${bucket}/${path} - functionality disabled`)
 }
 
 export function getFileUrl(bucket: string, path: string): string {
-  const { data } = supabase.storage
-    .from(bucket)
-    .getPublicUrl(path)
-
-  return data.publicUrl
+  // File URL generation is disabled as Supabase is not configured
+  // Return a placeholder URL
+  return `${process.env.SUPABASE_BUCKET_ENDPOINT || 'https://placeholder.com'}/${bucket}/${path}`
 }
 
 export function validateFileType(file: File, allowedTypes: string[]): boolean {
