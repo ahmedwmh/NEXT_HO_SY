@@ -73,6 +73,7 @@ model City {
   // Relations
   hospitals Hospital[]
   patients  Patient[]
+  visits    Visit[]
 
   @@index([name])
   @@map("cities")
@@ -98,6 +99,7 @@ model Hospital {
   treatments   Treatment[]
   operations   Operation[]
   prescriptions Prescription[]
+  visitDrafts  VisitDraft[] // مسودات الزيارات
 
   @@index([cityId])
   @@index([name])
@@ -125,6 +127,7 @@ model Doctor {
   operations Operation[]
   medications Medication[]
   prescriptions Prescription[]
+  visitDrafts VisitDraft[]
 
   @@index([hospitalId])
   @@index([specialization])
@@ -196,6 +199,7 @@ model Patient {
   attachments Attachment[]
   prescriptions Prescription[]
   images      PatientImage[] // صور إضافية للمريض
+  visitDrafts VisitDraft[] // مسودات الزيارات
 
   @@index([cityId])
   @@index([hospitalId])
@@ -213,8 +217,10 @@ model Visit {
   patientId   String
   doctorId    String?
   hospitalId  String?
+  cityId      String?
   scheduledAt DateTime
   status      VisitStatus @default(SCHEDULED)
+  currentStep Int         @default(1)
   notes       String?
   diagnosis   String?
   prescription String?
@@ -233,6 +239,7 @@ model Visit {
   patient  Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
   doctor   Doctor?  @relation(fields: [doctorId], references: [id], onDelete: SetNull)
   hospital Hospital? @relation(fields: [hospitalId], references: [id], onDelete: SetNull)
+  city     City?    @relation(fields: [cityId], references: [id], onDelete: SetNull)
   prescriptions Prescription[]
   tests    Test[]   // Tests related to this visit
   treatments Treatment[] // Treatments related to this visit
@@ -242,6 +249,7 @@ model Visit {
   @@index([patientId])
   @@index([doctorId])
   @@index([hospitalId])
+  @@index([cityId])
   @@index([scheduledAt])
   @@index([status])
   @@index([createdAt])
@@ -471,5 +479,175 @@ model Attachment {
   @@index([uploadedAt])
   @@index([isPrivate])
   @@map("attachments")
+}
+
+// ===== DRAFT SYSTEM TABLES =====
+// نظام المسودات المنفصل للزيارات
+
+model VisitDraft {
+  id          String      @id @default(cuid())
+  patientId   String
+  doctorId    String?
+  hospitalId  String?
+  scheduledAt DateTime
+  status      VisitStatus @default(DRAFT)
+  notes       String?
+  diagnosis   String?
+  prescription String?
+  symptoms    String?
+  vitalSigns  String?
+  temperature String?
+  bloodPressure String?
+  heartRate   String?
+  weight      String?
+  height      String?
+  images      String[]
+  
+  // Step tracking
+  currentStep Int         @default(1)
+  isCompleted Boolean     @default(false)
+  
+  // Auto-save tracking
+  lastSavedAt DateTime    @default(now())
+  autoSaveEnabled Boolean @default(true)
+  
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  // Relations
+  patient  Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  doctor   Doctor?  @relation(fields: [doctorId], references: [id], onDelete: SetNull)
+  hospital Hospital? @relation(fields: [hospitalId], references: [id], onDelete: SetNull)
+  
+  // Draft-specific relations
+  draftTests      VisitDraftTest[]
+  draftDiseases   VisitDraftDisease[]
+  draftTreatments VisitDraftTreatment[]
+  draftOperations VisitDraftOperation[]
+  draftMedications VisitDraftMedication[]
+
+  @@index([patientId])
+  @@index([doctorId])
+  @@index([hospitalId])
+  @@index([scheduledAt])
+  @@index([status])
+  @@index([currentStep])
+  @@index([isCompleted])
+  @@index([lastSavedAt])
+  @@map("visit_drafts")
+}
+
+model VisitDraftTest {
+  id          String     @id @default(cuid())
+  draftId     String
+  name        String
+  description String?
+  scheduledAt DateTime
+  status      TestStatus @default(SCHEDULED)
+  results     String?
+  notes       String?
+  images      String[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  // Relations
+  draft VisitDraft @relation(fields: [draftId], references: [id], onDelete: Cascade)
+
+  @@index([draftId])
+  @@index([name])
+  @@index([scheduledAt])
+  @@index([status])
+  @@map("visit_draft_tests")
+}
+
+model VisitDraftDisease {
+  id          String   @id @default(cuid())
+  draftId     String
+  name        String
+  description String?
+  diagnosedAt DateTime
+  severity    String?
+  status      String?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  draft VisitDraft @relation(fields: [draftId], references: [id], onDelete: Cascade)
+
+  @@index([draftId])
+  @@index([name])
+  @@index([diagnosedAt])
+  @@index([status])
+  @@map("visit_draft_diseases")
+}
+
+model VisitDraftTreatment {
+  id          String          @id @default(cuid())
+  draftId     String
+  name        String
+  description String?
+  scheduledAt DateTime
+  status      TreatmentStatus @default(SCHEDULED)
+  notes       String?
+  images      String[]
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  // Relations
+  draft VisitDraft @relation(fields: [draftId], references: [id], onDelete: Cascade)
+
+  @@index([draftId])
+  @@index([name])
+  @@index([scheduledAt])
+  @@index([status])
+  @@map("visit_draft_treatments")
+}
+
+model VisitDraftOperation {
+  id          String          @id @default(cuid())
+  draftId     String
+  name        String
+  description String?
+  scheduledAt DateTime
+  status      OperationStatus @default(SCHEDULED)
+  notes       String?
+  images      String[]
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  // Relations
+  draft VisitDraft @relation(fields: [draftId], references: [id], onDelete: Cascade)
+
+  @@index([draftId])
+  @@index([name])
+  @@index([scheduledAt])
+  @@index([status])
+  @@map("visit_draft_operations")
+}
+
+model VisitDraftMedication {
+  id          String   @id @default(cuid())
+  draftId     String
+  name        String
+  dosage      String?
+  frequency   String?
+  duration    String?
+  instructions String?
+  startDate   DateTime
+  endDate     DateTime?
+  status      String?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  draft VisitDraft @relation(fields: [draftId], references: [id], onDelete: Cascade)
+
+  @@index([draftId])
+  @@index([name])
+  @@index([startDate])
+  @@index([status])
+  @@map("visit_draft_medications")
 }
 

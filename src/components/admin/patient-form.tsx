@@ -34,18 +34,14 @@ export function PatientForm() {
   const { data: cities } = useQuery({
     queryKey: ['cities'],
     queryFn: async () => {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/cities', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      })
+      const response = await fetch('/api/cities')
       
       if (!response.ok) {
         throw new Error('Failed to fetch cities')
       }
       
       const result = await response.json()
+      console.log('🏙️ Cities query result in patient form:', result)
       return result.data || []
     },
   })
@@ -56,18 +52,14 @@ export function PatientForm() {
     queryFn: async () => {
       if (!selectedCityId) return []
       
-      const token = localStorage.getItem('token')
-      const response = await fetch(`/api/hospitals?cityId=${selectedCityId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      })
+      const response = await fetch(`/api/hospitals?cityId=${selectedCityId}`)
       
       if (!response.ok) {
         throw new Error('Failed to fetch hospitals')
       }
       
       const result = await response.json()
+      console.log('🏥 Hospitals query result in patient form:', result)
       return result.data || []
     },
     enabled: !!selectedCityId,

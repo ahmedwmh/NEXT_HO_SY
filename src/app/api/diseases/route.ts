@@ -4,97 +4,55 @@ import { prisma } from '@/lib/db'
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '30')
-    const skip = (page - 1) * limit
-    const patientId = searchParams.get('patientId')
+    const limit = parseInt(searchParams.get('limit') || '50')
+    const search = searchParams.get('search') || ''
 
-    const whereClause = patientId ? { patientId } : {}
-
-    const [diseases, total] = await Promise.all([
-      prisma.disease.findMany({
-        where: whereClause,
-        include: {
-          patient: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              patientNumber: true
-            }
-          }
-        },
-        orderBy: {
-          diagnosedAt: 'desc'
-        },
-        skip,
-        take: limit
-      }),
-      prisma.disease.count({ where: whereClause })
-    ])
-
-    return NextResponse.json({
-      data: diseases,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit)
+    const whereClause = search ? {
+      name: {
+        contains: search,
+        mode: 'insensitive' as const
       }
-    })
-  } catch (error) {
-    console.error('خطأ في جلب الأمراض:', error)
-    return NextResponse.json(
-      { error: 'فشل في جلب الأمراض' },
-      { status: 500 }
-    )
-  }
-}
+    } : {}
 
-export async function POST(request: NextRequest) {
-  try {
-    const data = await request.json()
-    const { patientId, name, description, diagnosedAt, severity, status, notes } = data
-
-    // Check if patient exists
-    const patient = await prisma.patient.findUnique({
-      where: { id: patientId }
-    })
-
-    if (!patient) {
-      return NextResponse.json(
-        { error: 'المريض المحدد غير موجود' },
-        { status: 400 }
-      )
-    }
-
-    const disease = await prisma.disease.create({
-      data: {
-        patientId,
-        name: name.trim(),
-        description: description?.trim() || null,
-        diagnosedAt: new Date(diagnosedAt),
-        severity: severity || null,
-        status: status || 'Active',
-        notes: notes?.trim() || null
-      },
-      include: {
+    const diseases = await prisma.disease.findMany({
+      where: whereClause,
+      select: {
+        id: true,
+        name: true,
+        description: true,
         patient: {
           select: {
             id: true,
             firstName: true,
-            lastName: true,
-            patientNumber: true
+            lastName: true
           }
         }
-      }
+      },
+      orderBy: { name: 'asc' },
+      take: limit
     })
 
-    return NextResponse.json(disease, { status: 201 })
+    // Get unique disease names for dropdown
+    const uniqueDiseases = diseases.reduce((acc, disease) => {
+      if (!acc.find(d => d.name === disease.name)) {
+        acc.push({
+          id: disease.id,
+          name: disease.name,
+          description: disease.description
+        })
+      }
+      return acc
+    }, [] as Array<{id: string, name: string, description: string | null}>)
+
+    return NextResponse.json({
+      success: true,
+      data: uniqueDiseases,
+      count: uniqueDiseases.length
+    })
   } catch (error) {
-    console.error('خطأ في إنشاء المرض:', error)
+    console.error('Error fetching diseases:', error)
     return NextResponse.json(
-      { error: 'فشل في إنشاء المرض' },
+      { success: false, error: 'Failed to fetch diseases' },
       { status: 500 }
     )
   }

@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import ComprehensiveVisitSystem from '@/components/admin/comprehensive-visit-system'
+import SimpleVisitForm from '@/components/admin/simple-visit-form'
 import { 
   User, 
   Phone, 
@@ -27,7 +27,7 @@ interface Patient {
   firstName: string
   lastName: string
   patientNumber: string
-  dateOfBirth: string
+  age: number
   gender: string
   bloodType: string
   nationality: string
@@ -84,24 +84,13 @@ export default function SimplePatientPage() {
   const fetchPatient = async () => {
     try {
       setLoading(true)
-      console.log('🔄 Fetching patient data for ID:', patientId)
       const response = await fetch(`/api/patients/${patientId}`)
       const result = await response.json()
-      console.log('📋 Patient API response:', result)
-      
-              if (result.success && result.data) {
-                setPatient(result.data)
-                console.log('✅ Patient loaded successfully:', result.data.firstName, result.data.lastName)
-                console.log('🏥 Hospital data:', result.data.hospital)
-                console.log('🏙️ City data:', result.data.city)
-                console.log('🏥 Hospital city:', result.data.hospital?.city)
-              } else {
-                console.error('❌ Failed to load patient:', result.error)
-                setPatient(null)
-              }
+      if (result.success) {
+        setPatient(result.data)
+      }
     } catch (error) {
       console.error('خطأ في جلب بيانات المريض:', error)
-      setPatient(null)
     } finally {
       setLoading(false)
     }
@@ -112,10 +101,8 @@ export default function SimplePatientPage() {
     try {
       const response = await fetch(`/api/visits?patientId=${patientId}`)
       const result = await response.json()
-      console.log('📋 Visits API response:', result)
       if (result.data) {
         setVisits(result.data)
-        console.log('✅ Visits loaded:', result.data.length)
       }
     } catch (error) {
       console.error('خطأ في جلب الزيارات:', error)
@@ -171,47 +158,19 @@ export default function SimplePatientPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="text-center">
-            <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-gray-600">جاري تحميل بيانات المريض...</p>
-          </div>
-        </div>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
       </div>
     )
   }
 
   if (!patient) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="text-center">
-            <p className="text-gray-500 text-lg">المريض غير موجود</p>
-            <p className="text-gray-400 text-sm mt-2">تأكد من صحة معرف المريض</p>
-          </div>
-        </div>
+      <div className="flex items-center justify-center min-h-screen">
+        <p className="text-gray-500">المريض غير موجود</p>
       </div>
     )
   }
-
-  // Calculate age from dateOfBirth
-  const calculateAge = (dateOfBirth: string) => {
-    const today = new Date()
-    const birthDate = new Date(dateOfBirth)
-    let age = today.getFullYear() - birthDate.getFullYear()
-    const monthDiff = today.getMonth() - birthDate.getMonth()
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-      age--
-    }
-    return age
-  }
-
-  // Debug logging
-  console.log('🔍 Current patient state:', patient)
-  console.log('🔍 Hospital data:', patient?.hospital)
-  // console.log('🔍 City data:', patient?.city) // City is accessed through hospital
-  console.log('🔍 Hospital city:', patient?.hospital?.city)
 
   // Separate visits and drafts
   const completedVisits = visits.filter(v => v.status === 'COMPLETED')
@@ -266,10 +225,10 @@ export default function SimplePatientPage() {
             <div>
               <h3 className="font-semibold text-gray-900 mb-2">المعلومات الشخصية</h3>
               <div className="space-y-1 text-sm text-gray-600">
-                <p>العمر: {calculateAge(patient.dateOfBirth)} سنة</p>
+                <p>العمر: {patient.age} سنة</p>
                 <p>الجنس: {patient.gender}</p>
                 <p>فصيلة الدم: {patient.bloodType}</p>
-                <p>الجنسية: {patient.nationality || 'غير محدد'}</p>
+                <p>الجنسية: {patient.nationality}</p>
               </div>
             </div>
             <div>
@@ -277,25 +236,25 @@ export default function SimplePatientPage() {
               <div className="space-y-1 text-sm text-gray-600">
                 <p className="flex items-center">
                   <Phone className="w-4 h-4 mr-2" />
-                  {patient.phone || 'غير محدد'}
+                  {patient.phone}
                 </p>
                 <p className="flex items-center">
                   <Mail className="w-4 h-4 mr-2" />
-                  {patient.email || 'غير محدد'}
+                  {patient.email}
                 </p>
                 <p className="flex items-center">
                   <MapPin className="w-4 h-4 mr-2" />
-                  {patient.address || 'غير محدد'}
+                  {patient.address}
                 </p>
               </div>
             </div>
             <div>
               <h3 className="font-semibold text-gray-900 mb-2">المعلومات الطبية</h3>
               <div className="space-y-1 text-sm text-gray-600">
-                <p>المستشفى: {patient.hospital?.name || 'غير محدد'}</p>
-                <p>المدينة: {patient.hospital?.city?.name || 'غير محدد'}</p>
-                <p>الحساسيات: {patient.allergies || 'لا توجد'}</p>
-                <p>التاريخ المرضي: {patient.medicalHistory || 'غير محدد'}</p>
+                <p>المستشفى: {patient.hospital.name}</p>
+                <p>المدينة: {patient.hospital.city.name}</p>
+                <p>الحساسيات: {patient.allergies}</p>
+                <p>التاريخ المرضي: {patient.medicalHistory}</p>
               </div>
             </div>
           </div>
@@ -446,9 +405,9 @@ export default function SimplePatientPage() {
           </TabsContent>
         </Tabs>
 
-        {/* Comprehensive Visit System Modal */}
+        {/* Visit Form Modal */}
         {showVisitForm && (
-          <ComprehensiveVisitSystem
+          <SimpleVisitForm
             patientId={patientId}
             isOpen={showVisitForm}
             onClose={() => {

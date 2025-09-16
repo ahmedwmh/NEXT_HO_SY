@@ -18,7 +18,13 @@ export async function GET(
         hospital: {
           select: {
             id: true,
-            name: true
+            name: true,
+            city: {
+              select: {
+                id: true,
+                name: true
+              }
+            }
           }
         },
         visits: {
@@ -105,16 +111,19 @@ export async function GET(
 
     if (!patient) {
       return NextResponse.json(
-        { error: 'المريض غير موجود' },
+        { success: false, error: 'المريض غير موجود' },
         { status: 404 }
       )
     }
 
-    return NextResponse.json(patient)
+    return NextResponse.json({
+      success: true,
+      data: patient
+    })
   } catch (error) {
     console.error('خطأ في جلب بيانات المريض:', error)
     return NextResponse.json(
-      { error: 'فشل في جلب بيانات المريض' },
+      { success: false, error: 'فشل في جلب بيانات المريض' },
       { status: 500 }
     )
   }

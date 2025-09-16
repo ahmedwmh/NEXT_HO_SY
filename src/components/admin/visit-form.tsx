@@ -45,11 +45,9 @@ export function VisitForm({ patientId, patientName, isOpen, onClose, onSuccess }
   const { data: doctors } = useQuery({
     queryKey: ['doctors'],
     queryFn: async () => {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/doctors', {
-        headers: { 'Authorization': `Bearer ${token}` },
-      })
+      const response = await fetch('/api/doctors')
       const result = await response.json()
+      console.log('👨‍⚕️ Doctors query result in visit form:', result)
       return result.data || []
     },
   })
@@ -58,11 +56,9 @@ export function VisitForm({ patientId, patientName, isOpen, onClose, onSuccess }
   const { data: hospitals } = useQuery({
     queryKey: ['hospitals'],
     queryFn: async () => {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/hospitals', {
-        headers: { 'Authorization': `Bearer ${token}` },
-      })
+      const response = await fetch('/api/hospitals')
       const result = await response.json()
+      console.log('🏥 Hospitals query result in visit form:', result)
       return result.data || []
     },
   })

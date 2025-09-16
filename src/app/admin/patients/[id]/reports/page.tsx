@@ -121,7 +121,7 @@ export default function PatientReportsPage() {
   })
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('ar-SA', {
+    return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
       day: 'numeric'
@@ -129,7 +129,7 @@ export default function PatientReportsPage() {
   }
 
   const formatDateTime = (dateString: string) => {
-    return new Date(dateString).toLocaleString('ar-SA', {
+    return new Date(dateString).toLocaleString('en-US', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
@@ -143,7 +143,7 @@ export default function PatientReportsPage() {
 
     let report = `تقرير زيارات المريض: ${patient.firstName} ${patient.lastName}\n`
     report += `رقم المريض: ${patient.patientNumber}\n`
-    report += `تاريخ التقرير: ${new Date().toLocaleDateString('ar-SA')}\n\n`
+    report += `تاريخ التقرير: ${new Date().toLocaleDateString('en-US')}\n\n`
 
     visits.data.forEach((visit: Visit, index: number) => {
       report += `الزيارة ${index + 1}:\n`
@@ -165,7 +165,7 @@ export default function PatientReportsPage() {
 
     let report = `تقرير فحوصات المريض: ${patient.firstName} ${patient.lastName}\n`
     report += `رقم المريض: ${patient.patientNumber}\n`
-    report += `تاريخ التقرير: ${new Date().toLocaleDateString('ar-SA')}\n\n`
+    report += `تاريخ التقرير: ${new Date().toLocaleDateString('en-US')}\n\n`
 
     tests.data.forEach((test: Test, index: number) => {
       report += `الفحص ${index + 1}:\n`
