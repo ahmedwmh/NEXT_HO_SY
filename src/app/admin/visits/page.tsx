@@ -282,6 +282,7 @@ export default function VisitsPage() {
             {
               key: 'status',
               label: 'الحالة',
+              type: 'select',
               options: [
                 { value: 'SCHEDULED', label: 'مجدولة' },
                 { value: 'IN_PROGRESS', label: 'جارية' },

@@ -57,7 +57,8 @@ export default function DiseasesPage() {
     category: '',
     severity: '',
     hospitalId: '',
-    cityId: ''
+    cityId: '',
+    isActive: true
   })
 
   useEffect(() => {
@@ -193,7 +194,8 @@ export default function DiseasesPage() {
       category: disease.category,
       severity: disease.severity,
       hospitalId: disease.hospital.id,
-      cityId: disease.hospital.city.id
+      cityId: disease.hospital.city.id,
+      isActive: disease.isActive
     })
     setShowAddForm(true)
   }
@@ -211,7 +213,8 @@ export default function DiseasesPage() {
       category: '',
       severity: '',
       hospitalId: '',
-      cityId: ''
+      cityId: '',
+      isActive: true
     })
     setHospitals([])
   }
