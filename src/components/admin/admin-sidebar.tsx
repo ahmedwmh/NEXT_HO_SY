@@ -16,7 +16,6 @@ import {
   TestTube,
   Stethoscope,
   Activity,
-  Settings,
   Menu,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -37,13 +36,43 @@ const navigation = [
   { name: 'الموظفين', href: '/admin/staff', icon: UserPlus },
   { name: 'المرضى', href: '/admin/patients', icon: Users },
   { name: 'الزيارات', href: '/admin/visits', icon: Calendar },
-  { name: 'الفحوصات', href: '/admin/tests', icon: TestTube },
-  { name: 'العلاجات', href: '/admin/treatments', icon: Stethoscope },
-  { name: 'العمليات', href: '/admin/operations', icon: Activity },
-  { name: 'الأمراض', href: '/admin/diseases', icon: Activity },
-  { name: 'الوصفات الطبية', href: '/admin/prescriptions', icon: FileText },
+  { 
+    name: 'الفحوصات', 
+    href: '/admin/tests/manage', 
+    icon: TestTube,
+    submenu: [
+      { name: 'إدارة الفحوصات', href: '/admin/tests/manage' },
+      { name: 'عرض الفحوصات', href: '/admin/tests' }
+    ]
+  },
+  { 
+    name: 'العلاجات', 
+    href: '/admin/treatments/manage', 
+    icon: Stethoscope,
+    submenu: [
+      { name: 'إدارة العلاجات', href: '/admin/treatments/manage' },
+      { name: 'عرض العلاجات', href: '/admin/treatments' }
+    ]
+  },
+  { 
+    name: 'العمليات', 
+    href: '/admin/operations/manage', 
+    icon: Activity,
+    submenu: [
+      { name: 'إدارة العمليات', href: '/admin/operations/manage' },
+      { name: 'عرض العمليات', href: '/admin/operations' }
+    ]
+  },
+  { 
+    name: 'الأمراض', 
+    href: '/admin/diseases/manage', 
+    icon: Activity,
+    submenu: [
+      { name: 'إدارة الأمراض', href: '/admin/diseases/manage' },
+      { name: 'عرض الأمراض', href: '/admin/diseases' }
+    ]
+  },
   { name: 'التقارير', href: '/admin/reports', icon: FileText },
-  { name: 'الإعدادات', href: '/admin/settings', icon: Settings },
 ]
 
 interface AdminSidebarProps {

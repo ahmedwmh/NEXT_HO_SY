@@ -19,17 +19,19 @@ export function useData(): UseDataReturn {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // Debug: Monitor hospitals state changes
+  useEffect(() => {
+    console.log('🔄 useData: hospitals state changed to:', hospitals.length, 'hospitals')
+  }, [hospitals])
+
   const loadData = useCallback(async () => {
-    console.log('🔄 useData: Starting data load...')
     try {
       setLoading(true)
       setError(null)
 
-      console.log('🔄 useData: Calling dataService methods...')
       
       // Load each data source independently to handle individual failures
       const loadCities = dataService.getCities().then(data => {
-        console.log('🏙️ useData: Cities loaded:', data)
         return data
       }).catch(err => {
         console.error('❌ useData: Cities failed:', err)
@@ -84,18 +86,34 @@ export function useData(): UseDataReturn {
       const doctorsResult = doctorsData.status === 'fulfilled' ? doctorsData.value : []
       const patientsResult = patientsData.status === 'fulfilled' ? patientsData.value : []
       
-      console.log('📊 useData: Extracted data:', {
-        citiesCount: citiesResult.length,
-        hospitalsCount: hospitalsResult.length,
-        doctorsCount: doctorsResult.length,
-        patientsCount: patientsResult.length,
-        patients: patientsResult.slice(0, 2) // Show first 2 patients
+      console.log('🔍 useData: Raw results:', {
+        citiesData: citiesData.status,
+        hospitalsData: hospitalsData.status,
+        doctorsData: doctorsData.status,
+        patientsData: patientsData.status
       })
       
-      setCities(citiesResult)
-      setHospitals(hospitalsResult)
-      setDoctors(doctorsResult)
-      setPatients(patientsResult)
+      console.log('🔍 useData: Extracted results:', {
+        citiesResult: Array.isArray(citiesResult) ? citiesResult.length : 'not array',
+        hospitalsResult: Array.isArray(hospitalsResult) ? hospitalsResult.length : 'not array',
+        doctorsResult: Array.isArray(doctorsResult) ? doctorsResult.length : 'not array',
+        patientsResult: Array.isArray(patientsResult) ? patientsResult.length : 'not array'
+      })
+      
+      console.log('📊 useData: Extracted data:', {
+        citiesCount: Array.isArray(citiesResult) ? citiesResult.length : 0,
+        hospitalsCount: Array.isArray(hospitalsResult) ? hospitalsResult.length : 0,
+        doctorsCount: Array.isArray(doctorsResult) ? doctorsResult.length : 0,
+        patientsCount: Array.isArray(patientsResult) ? patientsResult.length : 0,
+        patients: Array.isArray(patientsResult) ? patientsResult.slice(0, 2) : [] // Show first 2 patients
+      })
+      
+      console.log('🔄 useData: Setting state...')
+      setCities(Array.isArray(citiesResult) ? citiesResult : [])
+      console.log('🔄 useData: Setting hospitals to:', Array.isArray(hospitalsResult) ? hospitalsResult.length : 'not array')
+      setHospitals(Array.isArray(hospitalsResult) ? hospitalsResult : [])
+      setDoctors(Array.isArray(doctorsResult) ? doctorsResult : [])
+      setPatients(Array.isArray(patientsResult) ? patientsResult : [])
       
       console.log('✅ useData: State updated successfully')
     } catch (err) {

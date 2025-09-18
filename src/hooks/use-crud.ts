@@ -116,12 +116,10 @@ export function useCrud<T extends { id: string }>({
 
   const fetch = useCallback(async (): Promise<void> => {
     try {
-      console.log('useCrud fetch called for endpoint:', endpoint)
       setLoading(true)
       setError(null)
       
       const response = await (globalThis as any).fetch(endpoint)
-      console.log('useCrud fetch response:', response.status, response.ok)
       
       if (!response.ok) {
         const errorData = await response.json()

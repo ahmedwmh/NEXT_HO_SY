@@ -97,6 +97,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
+
     // Verify hospital belongs to the selected city
     if (hospital.cityId !== cityId) {
       return NextResponse.json(

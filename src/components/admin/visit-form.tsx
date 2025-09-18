@@ -47,7 +47,6 @@ export function VisitForm({ patientId, patientName, isOpen, onClose, onSuccess }
     queryFn: async () => {
       const response = await fetch('/api/doctors')
       const result = await response.json()
-      console.log('👨‍⚕️ Doctors query result in visit form:', result)
       return result.data || []
     },
   })
@@ -58,7 +57,6 @@ export function VisitForm({ patientId, patientName, isOpen, onClose, onSuccess }
     queryFn: async () => {
       const response = await fetch('/api/hospitals')
       const result = await response.json()
-      console.log('🏥 Hospitals query result in visit form:', result)
       return result.data || []
     },
   })

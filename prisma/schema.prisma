@@ -100,6 +100,12 @@ model Hospital {
   operations   Operation[]
   prescriptions Prescription[]
   visitDrafts  VisitDraft[] // مسودات الزيارات
+  
+  // Hospital-specific medical data
+  hospitalDiseases   HospitalDisease[]
+  hospitalTests      HospitalTest[]
+  hospitalTreatments HospitalTreatment[]
+  hospitalOperations HospitalOperation[]
 
   @@index([cityId])
   @@index([name])
@@ -649,5 +655,95 @@ model VisitDraftMedication {
   @@index([startDate])
   @@index([status])
   @@map("visit_draft_medications")
+}
+
+// ===== HOSPITAL-SPECIFIC MEDICAL DATA =====
+// بيانات طبية مخصصة لكل مستشفى
+
+model HospitalDisease {
+  id          String   @id @default(cuid())
+  hospitalId  String
+  name        String
+  description String?
+  category    String?  // فئة المرض (قلبية، عصبية، إلخ)
+  severity    String?  // مستوى الخطورة
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  hospital Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+
+  @@index([hospitalId])
+  @@index([name])
+  @@index([category])
+  @@index([isActive])
+  @@map("hospital_diseases")
+}
+
+model HospitalTest {
+  id          String   @id @default(cuid())
+  hospitalId  String
+  name        String
+  description String?
+  category    String?  // فئة الفحص (دم، أشعة، إلخ)
+  duration    String?  // مدة الفحص
+  cost        Decimal? // تكلفة الفحص
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  hospital Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+
+  @@index([hospitalId])
+  @@index([name])
+  @@index([category])
+  @@index([isActive])
+  @@map("hospital_tests")
+}
+
+model HospitalTreatment {
+  id          String   @id @default(cuid())
+  hospitalId  String
+  name        String
+  description String?
+  category    String?  // فئة العلاج (دوائي، فيزيائي، إلخ)
+  duration    String?  // مدة العلاج
+  cost        Decimal? // تكلفة العلاج
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  hospital Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+
+  @@index([hospitalId])
+  @@index([name])
+  @@index([category])
+  @@index([isActive])
+  @@map("hospital_treatments")
+}
+
+model HospitalOperation {
+  id          String   @id @default(cuid())
+  hospitalId  String
+  name        String
+  description String?
+  category    String?  // فئة العملية (جراحية، تنظيرية، إلخ)
+  duration    String?  // مدة العملية
+  cost        Decimal? // تكلفة العملية
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  hospital Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+
+  @@index([hospitalId])
+  @@index([name])
+  @@index([category])
+  @@index([isActive])
+  @@map("hospital_operations")
 }
 

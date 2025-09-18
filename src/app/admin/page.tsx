@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { UniversalSearch } from '@/components/ui/universal-search'
@@ -40,6 +41,7 @@ interface DashboardStats {
 }
 
 export default function AdminDashboard() {
+  const router = useRouter()
   const [stats, setStats] = useState<DashboardStats>({
     totalPatients: 0,
     totalHospitals: 0,
@@ -93,44 +95,44 @@ export default function AdminDashboard() {
       href: '/admin/patients/new'
     },
     {
-      id: 'new-doctor',
-      label: 'إضافة طبيب جديد',
-      description: 'تسجيل طبيب جديد في النظام',
+      id: 'view-patients',
+      label: 'عرض المرضى',
+      description: 'عرض وإدارة قائمة المرضى',
+      icon: Users,
+      color: 'bg-blue-600 hover:bg-blue-700',
+      href: '/admin/patients'
+    },
+    {
+      id: 'view-doctors',
+      label: 'عرض الأطباء',
+      description: 'عرض وإدارة قائمة الأطباء',
       icon: UserCheck,
       color: 'bg-green-500 hover:bg-green-600',
-      href: '/admin/doctors/new'
+      href: '/admin/doctors'
     },
     {
-      id: 'new-hospital',
-      label: 'إضافة مستشفى جديد',
-      description: 'تسجيل مستشفى جديد في النظام',
+      id: 'view-hospitals',
+      label: 'عرض المستشفيات',
+      description: 'عرض وإدارة قائمة المستشفيات',
       icon: Building,
       color: 'bg-purple-500 hover:bg-purple-600',
-      href: '/admin/hospitals/new'
+      href: '/admin/hospitals'
     },
     {
-      id: 'new-visit',
-      label: 'زيارة طبية جديدة',
-      description: 'إضافة زيارة طبية جديدة',
-      icon: Calendar,
-      color: 'bg-orange-500 hover:bg-orange-600',
-      href: '/admin/visits/new'
+      id: 'view-cities',
+      label: 'عرض المدن',
+      description: 'عرض وإدارة قائمة المدن',
+      icon: MapPin,
+      color: 'bg-indigo-500 hover:bg-indigo-600',
+      href: '/admin/cities'
     },
     {
-      id: 'new-test',
-      label: 'فحص طبي جديد',
-      description: 'إضافة فحص طبي جديد',
-      icon: TestTube,
-      color: 'bg-red-500 hover:bg-red-600',
-      href: '/admin/tests/new'
-    },
-    {
-      id: 'new-prescription',
-      label: 'وصفة طبية جديدة',
-      description: 'إضافة وصفة طبية جديدة',
-      icon: Pill,
-      color: 'bg-pink-500 hover:bg-pink-600',
-      href: '/admin/prescriptions/new'
+      id: 'view-staff',
+      label: 'عرض الموظفين',
+      description: 'عرض وإدارة قائمة الموظفين',
+      icon: Users,
+      color: 'bg-gray-500 hover:bg-gray-600',
+      href: '/admin/staff'
     }
   ]
 
@@ -174,7 +176,7 @@ export default function AdminDashboard() {
   ]
 
   const handleQuickAction = (href: string) => {
-    window.location.href = href
+    router.push(href)
   }
 
   return (
@@ -222,7 +224,7 @@ export default function AdminDashboard() {
 
       {/* Statistics Cards */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => window.location.href = '/admin/patients'}>
+        <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => router.push('/admin/patients')}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">إجمالي المرضى</CardTitle>
             <Users className="h-4 w-4 text-hospital-blue" />
@@ -239,7 +241,7 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => window.location.href = '/admin/hospitals'}>
+        <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => router.push('/admin/hospitals')}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">المستشفيات</CardTitle>
             <Building className="h-4 w-4 text-hospital-blue" />
@@ -256,7 +258,7 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => window.location.href = '/admin/doctors'}>
+        <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => router.push('/admin/doctors')}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">الأطباء</CardTitle>
             <UserCheck className="h-4 w-4 text-hospital-blue" />
@@ -273,7 +275,7 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => window.location.href = '/admin/staff'}>
+        <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => router.push('/admin/staff')}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">الموظفين</CardTitle>
             <Users className="h-4 w-4 text-hospital-blue" />
@@ -292,7 +294,7 @@ export default function AdminDashboard() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => window.location.href = '/admin/visits'}>
+        <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => router.push('/admin/patients')}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">الزيارات</CardTitle>
             <Calendar className="h-4 w-4 text-green-600" />
@@ -309,7 +311,7 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => window.location.href = '/admin/tests'}>
+        <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => router.push('/admin/patients')}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">الفحوصات</CardTitle>
             <TestTube className="h-4 w-4 text-orange-600" />
@@ -326,7 +328,7 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => window.location.href = '/admin/treatments'}>
+        <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => router.push('/admin/patients')}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">العلاجات</CardTitle>
             <Stethoscope className="h-4 w-4 text-purple-600" />
@@ -343,7 +345,7 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => window.location.href = '/admin/operations'}>
+        <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => router.push('/admin/patients')}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">العمليات</CardTitle>
             <Activity className="h-4 w-4 text-red-600" />

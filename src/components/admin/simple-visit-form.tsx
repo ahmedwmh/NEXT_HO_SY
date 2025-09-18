@@ -76,7 +76,6 @@ export default function SimpleVisitForm({ patientId, isOpen, onClose, visitId }:
     queryFn: async () => {
       const response = await fetch('/api/cities')
       const result = await response.json()
-      console.log('🏙️ Cities query result in simple form:', result)
       return result.data || []
     }
   })
@@ -86,7 +85,6 @@ export default function SimpleVisitForm({ patientId, isOpen, onClose, visitId }:
     queryFn: async () => {
       const response = await fetch('/api/hospitals')
       const result = await response.json()
-      console.log('🏥 Hospitals query result in simple form:', result)
       return result.data || []
     }
   })
@@ -132,9 +130,40 @@ export default function SimpleVisitForm({ patientId, isOpen, onClose, visitId }:
     },
     onSuccess: (data, isComplete) => {
       queryClient.invalidateQueries({ queryKey: ['visits', patientId] })
-      toast.success(isComplete ? 'تم حفظ الزيارة بنجاح' : 'تم حفظ المسودة بنجاح')
+      
+      // Show beautiful success notification
       if (isComplete) {
-        onClose()
+        toast.success('🎉 تم حفظ الزيارة بنجاح!', {
+          duration: 3000,
+          style: {
+            background: '#10B981',
+            color: '#fff',
+            fontSize: '16px',
+            padding: '16px 24px',
+            borderRadius: '8px',
+            boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)'
+          }
+        })
+        // Close form after a short delay
+        setTimeout(() => {
+          onClose()
+        }, 1500)
+      } else {
+        toast.success('💾 تم حفظ المسودة بنجاح!', {
+          duration: 3000,
+          style: {
+            background: '#3B82F6',
+            color: '#fff',
+            fontSize: '16px',
+            padding: '16px 24px',
+            borderRadius: '8px',
+            boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)'
+          }
+        })
+        // Close form after a short delay for draft save too
+        setTimeout(() => {
+          onClose()
+        }, 1500)
       }
     },
     onError: (error) => {

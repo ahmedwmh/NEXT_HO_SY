@@ -99,6 +99,7 @@ export default function ComprehensiveVisitSystem({
 }: ComprehensiveVisitSystemProps) {
   const [currentStep, setCurrentStep] = useState(1)
   const [isLoading, setIsLoading] = useState(false)
+  const [savedSteps, setSavedSteps] = useState<Set<number>>(new Set())
   const [visitData, setVisitData] = useState<VisitData>({
     scheduledAt: '',
     symptoms: '',
@@ -131,10 +132,6 @@ export default function ComprehensiveVisitSystem({
   // Load existing visit data
   useEffect(() => {
     if (existingVisit) {
-      console.log('🔄 ===== LOADING EXISTING VISIT DATA =====')
-      console.log('📊 Raw existing visit data:', JSON.stringify(existingVisit, null, 2))
-      console.log('🔍 Visit ID:', existingVisit.id)
-      console.log('👤 Patient ID:', existingVisit.patientId)
       console.log('🏥 Hospital ID:', existingVisit.hospitalId)
       console.log('👨‍⚕️ Doctor ID:', existingVisit.doctorId)
       console.log('🏙️ City ID:', existingVisit.cityId)
@@ -242,6 +239,58 @@ export default function ComprehensiveVisitSystem({
       setVisitData(formattedVisitData)
       setCurrentStep(existingVisit.currentStep || 1)
       
+      // Determine saved steps based on loaded data
+      const loadedSavedSteps = new Set<number>()
+      
+      // Step 1: Basic info (always saved if visit exists)
+      if (formattedVisitData.scheduledAt || formattedVisitData.doctorId || formattedVisitData.hospitalId) {
+        loadedSavedSteps.add(1)
+      }
+      
+      // Step 2: Tests - only if there are actual tests with data
+      if (formattedVisitData.tests && formattedVisitData.tests.length > 0) {
+        const hasValidTests = formattedVisitData.tests.some((test: any) => 
+          test.name && test.name.trim() !== ''
+        )
+        if (hasValidTests) {
+          loadedSavedSteps.add(2)
+        }
+      }
+      
+      // Step 3: Diseases - only if there are actual diseases with data
+      if (formattedVisitData.diseases && formattedVisitData.diseases.length > 0) {
+        const hasValidDiseases = formattedVisitData.diseases.some((disease: any) => 
+          disease.name && disease.name.trim() !== ''
+        )
+        if (hasValidDiseases) {
+          loadedSavedSteps.add(3)
+        }
+      }
+      
+      // Step 4: Treatments - only if there are actual treatments with data
+      if (formattedVisitData.treatments && formattedVisitData.treatments.length > 0) {
+        const hasValidTreatments = formattedVisitData.treatments.some((treatment: any) => 
+          treatment.name && treatment.name.trim() !== ''
+        )
+        if (hasValidTreatments) {
+          loadedSavedSteps.add(4)
+        }
+      }
+      
+      // Step 5: Operations and Medications - only if there are actual data
+      const hasValidOperations = formattedVisitData.operations && formattedVisitData.operations.length > 0 && 
+        formattedVisitData.operations.some((operation: any) => operation.name && operation.name.trim() !== '')
+      
+      const hasValidMedications = formattedVisitData.medications && formattedVisitData.medications.length > 0 && 
+        formattedVisitData.medications.some((medication: any) => medication.name && medication.name.trim() !== '')
+      
+      if (hasValidOperations || hasValidMedications) {
+        loadedSavedSteps.add(5)
+      }
+      
+      console.log('🔍 Detected saved steps from loaded data:', Array.from(loadedSavedSteps))
+      setSavedSteps(loadedSavedSteps)
+      
            console.log('✅ ===== VISIT DATA LOADED SUCCESSFULLY =====')
            console.log('📊 Final visit data state:', formattedVisitData)
            console.log('📝 Current step set to:', existingVisit.currentStep || 1)
@@ -269,32 +318,43 @@ export default function ComprehensiveVisitSystem({
   const { data: doctors, isLoading: isLoadingDoctors } = useQuery({
     queryKey: ['doctors'],
     queryFn: async () => {
+      console.log('👨‍⚕️ ===== FETCHING DOCTORS =====')
       const response = await fetch('/api/doctors')
+      console.log('👨‍⚕️ Doctors response status:', response.status)
       const result = await response.json()
       console.log('👨‍⚕️ Doctors query result:', result)
-      return result.data || []
+      const doctorsData = Array.isArray(result) ? result : (result.data || [])
+      console.log('👨‍⚕️ Doctors data after processing:', doctorsData)
+      return doctorsData
     }
   })
 
   const { data: hospitals, isLoading: isLoadingHospitals } = useQuery({
     queryKey: ['hospitals'],
     queryFn: async () => {
+      console.log('🏥 ===== FETCHING HOSPITALS =====')
       const response = await fetch('/api/hospitals')
+      console.log('🏥 Hospitals response status:', response.status)
       const result = await response.json()
       console.log('🏥 Hospitals query result:', result)
-      return result.data || []
+      const hospitalsData = Array.isArray(result) ? result : (result.data || [])
+      console.log('🏥 Hospitals data after processing:', hospitalsData)
+      return hospitalsData
     }
   })
 
   const { data: availableTests, isLoading: isLoadingTests } = useQuery({
-    queryKey: ['tests'],
+    queryKey: ['hospital-tests'],
     queryFn: async () => {
       console.log('🧪 ===== FETCHING AVAILABLE TESTS =====')
-      console.log('🌐 API endpoint: /api/tests')
+      console.log('🌐 API endpoint: /api/hospital-tests')
       
-      const response = await fetch('/api/tests')
+      const response = await fetch('/api/hospital-tests')
       console.log('📡 Response status:', response.status)
-      console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()))
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch tests')
+      }
       
       const result = await response.json()
       console.log('📥 Raw API response:', JSON.stringify(result, null, 2))
@@ -308,10 +368,15 @@ export default function ComprehensiveVisitSystem({
   })
 
   const { data: availableDiseases, isLoading: isLoadingDiseases } = useQuery({
-    queryKey: ['diseases'],
+    queryKey: ['hospital-diseases'],
     queryFn: async () => {
       console.log('🦠 ===== FETCHING AVAILABLE DISEASES =====')
-      const response = await fetch('/api/diseases')
+      const response = await fetch('/api/hospital-diseases')
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch diseases')
+      }
+      
       const result = await response.json()
       console.log('🦠 Available diseases count:', result.data?.length || 0)
       return result.data || []
@@ -319,10 +384,15 @@ export default function ComprehensiveVisitSystem({
   })
 
   const { data: availableTreatments, isLoading: isLoadingTreatments } = useQuery({
-    queryKey: ['treatments'],
+    queryKey: ['hospital-treatments'],
     queryFn: async () => {
       console.log('💊 ===== FETCHING AVAILABLE TREATMENTS =====')
-      const response = await fetch('/api/treatments')
+      const response = await fetch('/api/hospital-treatments')
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch treatments')
+      }
+      
       const result = await response.json()
       console.log('💊 Available treatments count:', result.data?.length || 0)
       return result.data || []
@@ -330,10 +400,15 @@ export default function ComprehensiveVisitSystem({
   })
 
   const { data: availableOperations, isLoading: isLoadingOperations } = useQuery({
-    queryKey: ['operations'],
+    queryKey: ['hospital-operations'],
     queryFn: async () => {
       console.log('🏥 ===== FETCHING AVAILABLE OPERATIONS =====')
-      const response = await fetch('/api/operations')
+      const response = await fetch('/api/hospital-operations')
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch operations')
+      }
+      
       const result = await response.json()
       console.log('🏥 Available operations count:', result.data?.length || 0)
       return result.data || []
@@ -360,6 +435,14 @@ export default function ComprehensiveVisitSystem({
   const filteredDoctors = doctors?.filter((doctor: any) => 
     !visitData.hospitalId || doctor.hospitalId === visitData.hospitalId
   ) || []
+
+  // Debug logs
+  console.log('🔍 Debug - hospitals:', hospitals)
+  console.log('🔍 Debug - doctors:', doctors)
+  console.log('🔍 Debug - filteredHospitals:', filteredHospitals)
+  console.log('🔍 Debug - filteredDoctors:', filteredDoctors)
+  console.log('🔍 Debug - visitData.cityId:', visitData.cityId)
+  console.log('🔍 Debug - visitData.hospitalId:', visitData.hospitalId)
 
   // Save visit (draft or complete)
   const saveVisit = useMutation({
@@ -501,7 +584,27 @@ export default function ComprehensiveVisitSystem({
   })
 
   const handleSave = (isComplete: boolean = false) => {
+    // Check if current step is already saved
+    if (savedSteps.has(currentStep)) {
+      toast.error('⚠️ هذه الخطوة محفوظة مسبقاً!', {
+        duration: 3000,
+        style: {
+          background: '#F59E0B',
+          color: '#fff',
+          fontSize: '16px',
+          padding: '16px 24px',
+          borderRadius: '8px',
+          boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)'
+        }
+      })
+      return
+    }
+
     setIsLoading(true)
+    
+    // Add current step to saved steps
+    setSavedSteps(prev => new Set(Array.from(prev).concat(currentStep)))
+    
     saveVisit.mutate(isComplete, {
       onSettled: () => setIsLoading(false)
     })
@@ -795,6 +898,32 @@ export default function ComprehensiveVisitSystem({
           />
         </div>
 
+        {/* Steps Indicator */}
+        <div className="flex justify-between mb-6">
+          {[1, 2, 3, 4, 5].map((step) => (
+            <div key={step} className="flex flex-col items-center">
+              <div className={`
+                w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold
+                ${step === currentStep 
+                  ? 'bg-blue-600 text-white' 
+                  : savedSteps.has(step) 
+                    ? 'bg-green-500 text-white' 
+                    : 'bg-gray-300 text-gray-600'
+                }
+              `}>
+                {savedSteps.has(step) ? '✓' : step}
+              </div>
+              <span className="text-xs mt-1 text-gray-600">
+                {step === 1 ? 'معلومات أساسية' :
+                 step === 2 ? 'فحوصات' :
+                 step === 3 ? 'أمراض' :
+                 step === 4 ? 'علاجات' :
+                 'أدوية'}
+              </span>
+            </div>
+          ))}
+        </div>
+
         {/* Step 1: Basic Visit Information */}
         {currentStep === 1 && (
           <Card>
@@ -827,7 +956,7 @@ export default function ComprehensiveVisitSystem({
                     </SelectTrigger>
                     <SelectContent>
                       {isLoadingCities ? (
-                        <SelectItem value="" disabled>
+                        <SelectItem value="loading" disabled>
                           جاري التحميل...
                         </SelectItem>
                       ) : (
@@ -860,15 +989,19 @@ export default function ComprehensiveVisitSystem({
                     </SelectTrigger>
                     <SelectContent>
                       {isLoadingHospitals ? (
-                        <SelectItem value="" disabled>
+                        <SelectItem value="loading" disabled>
                           جاري التحميل...
                         </SelectItem>
-                      ) : (
-                        filteredHospitals?.map((hospital: any) => (
+                      ) : filteredHospitals?.length > 0 ? (
+                        filteredHospitals.map((hospital: any) => (
                           <SelectItem key={hospital.id} value={hospital.id}>
                             {hospital.name}
                           </SelectItem>
                         ))
+                      ) : (
+                        <SelectItem value="no-hospitals" disabled>
+                          لا توجد مستشفيات متاحة
+                        </SelectItem>
                       )}
                     </SelectContent>
                   </Select>
@@ -888,15 +1021,19 @@ export default function ComprehensiveVisitSystem({
                     </SelectTrigger>
                     <SelectContent>
                       {isLoadingDoctors ? (
-                        <SelectItem value="" disabled>
+                        <SelectItem value="loading" disabled>
                           جاري التحميل...
                         </SelectItem>
-                      ) : (
-                        filteredDoctors?.map((doctor: any) => (
+                      ) : filteredDoctors?.length > 0 ? (
+                        filteredDoctors.map((doctor: any) => (
                           <SelectItem key={doctor.id} value={doctor.id}>
                             د. {doctor.firstName} {doctor.lastName} - {doctor.specialization}
                           </SelectItem>
                         ))
+                      ) : (
+                        <SelectItem value="no-doctors" disabled>
+                          لا توجد أطباء متاحين
+                        </SelectItem>
                       )}
                     </SelectContent>
                   </Select>
@@ -1602,10 +1739,29 @@ export default function ComprehensiveVisitSystem({
             <Button 
               variant="outline" 
               onClick={() => handleSave(false)}
-              disabled={isLoading}
+              disabled={isLoading || savedSteps.has(currentStep)}
+              className={`min-w-[120px] ${
+                savedSteps.has(currentStep) 
+                  ? 'bg-green-100 border-green-300 text-green-700' 
+                  : ''
+              }`}
             >
-              <Save className="w-4 h-4 mr-1" />
-              {isLoading ? 'جاري الحفظ...' : 'حفظ مؤقت'}
+              {isLoading ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+                  جاري الحفظ...
+                </>
+              ) : savedSteps.has(currentStep) ? (
+                <>
+                  <CheckCircle className="w-4 h-4 mr-1" />
+                  محفوظ ✓
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4 mr-1" />
+                  حفظ مؤقت
+                </>
+              )}
             </Button>
             {currentStep < 5 ? (
               <Button onClick={nextStep}>

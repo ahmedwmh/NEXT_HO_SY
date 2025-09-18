@@ -219,7 +219,7 @@ export default function HospitalsPage() {
       sortable: true,
       render: (value: any[], hospital: Hospital) => (
         <Badge variant="outline">
-          {hospital.doctors.length} طبيب
+          {hospital.doctors?.length || 0} طبيب
         </Badge>
       )
     },
@@ -229,7 +229,7 @@ export default function HospitalsPage() {
       sortable: true,
       render: (value: any[], hospital: Hospital) => (
         <Badge variant="outline">
-          {hospital.patients.length} مريض
+          {hospital.patients?.length || 0} مريض
         </Badge>
       )
     }

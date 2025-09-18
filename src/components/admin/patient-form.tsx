@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery } from '@tanstack/react-query'
@@ -18,6 +18,9 @@ export function PatientForm() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [uploadedPhotoUrl, setUploadedPhotoUrl] = useState<string | null>(null)
   const [selectedCityId, setSelectedCityId] = useState<string>('')
+  const [selectedHospitalId, setSelectedHospitalId] = useState<string>('')
+  const [hospitals, setHospitals] = useState<any[]>([])
+  const [loadingHospitals, setLoadingHospitals] = useState(false)
   const router = useRouter()
 
   const {
@@ -31,39 +34,53 @@ export function PatientForm() {
   })
 
   // Fetch cities for the select dropdown
-  const { data: cities } = useQuery({
-    queryKey: ['cities'],
-    queryFn: async () => {
-      const response = await fetch('/api/cities')
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch cities')
-      }
-      
-      const result = await response.json()
-      console.log('🏙️ Cities query result in patient form:', result)
-      return result.data || []
-    },
-  })
+  const [cities, setCities] = useState<any[]>([])
+  const [loadingCities, setLoadingCities] = useState(true)
 
-  // Fetch hospitals based on selected city
-  const { data: hospitals } = useQuery({
-    queryKey: ['hospitals', selectedCityId],
-    queryFn: async () => {
-      if (!selectedCityId) return []
-      
-      const response = await fetch(`/api/hospitals?cityId=${selectedCityId}`)
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch hospitals')
-      }
-      
-      const result = await response.json()
-      console.log('🏥 Hospitals query result in patient form:', result)
-      return result.data || []
-    },
-    enabled: !!selectedCityId,
-  })
+  useEffect(() => {
+    fetchCities()
+  }, [])
+
+  const fetchCities = async () => {
+    try {
+      setLoadingCities(true)
+      const response = await fetch('/api/cities')
+      if (!response.ok) throw new Error('Failed to fetch cities')
+      const data = await response.json()
+      setCities(data.data || [])
+    } catch (error) {
+      console.error('Error fetching cities:', error)
+      setCities([])
+    } finally {
+      setLoadingCities(false)
+    }
+  }
+
+  const fetchHospitals = async (cityId: string) => {
+    try {
+      setLoadingHospitals(true)
+      const response = await fetch(`/api/hospitals?cityId=${cityId}`)
+      if (!response.ok) throw new Error('Failed to fetch hospitals')
+      const data = await response.json()
+      setHospitals(data || [])
+    } catch (error) {
+      console.error('Error fetching hospitals:', error)
+      setHospitals([])
+    } finally {
+      setLoadingHospitals(false)
+    }
+  }
+
+  const handleCityChange = (cityId: string) => {
+    setSelectedCityId(cityId)
+    setSelectedHospitalId('')
+    setValue('hospitalId', '')
+    setHospitals([])
+    
+    if (cityId) {
+      fetchHospitals(cityId)
+    }
+  }
 
   const createPatientMutation = useMutation({
     mutationFn: async (data: CreatePatientInput) => {
@@ -314,15 +331,16 @@ export function PatientForm() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <Label htmlFor="cityId">City *</Label>
-                <Select onValueChange={(value) => {
-                  setSelectedCityId(value)
-                  setValue('hospitalId', '') // Reset hospital selection when city changes
-                }}>
+                <Select 
+                  value={selectedCityId}
+                  onValueChange={handleCityChange}
+                  disabled={loadingCities}
+                >
                   <SelectTrigger className="hospital-input">
-                    <SelectValue placeholder="Select city first" />
+                    <SelectValue placeholder={loadingCities ? "Loading..." : "Select city first"} />
                   </SelectTrigger>
                   <SelectContent>
-                    {cities?.map((city: any) => (
+                    {cities.map((city: any) => (
                       <SelectItem key={city.id} value={city.id}>
                         {city.name}
                       </SelectItem>
@@ -337,14 +355,22 @@ export function PatientForm() {
               <div className="space-y-2">
                 <Label htmlFor="hospitalId">Hospital *</Label>
                 <Select 
-                  onValueChange={(value) => setValue('hospitalId', value)}
-                  disabled={!selectedCityId}
+                  value={selectedHospitalId}
+                  onValueChange={(value) => {
+                    setValue('hospitalId', value)
+                    setSelectedHospitalId(value)
+                  }}
+                  disabled={!selectedCityId || loadingHospitals}
                 >
                   <SelectTrigger className="hospital-input">
-                    <SelectValue placeholder={selectedCityId ? "Select hospital" : "Select city first"} />
+                    <SelectValue placeholder={
+                      loadingHospitals ? "Loading..." : 
+                      !selectedCityId ? "Select city first" : 
+                      "Select hospital"
+                    } />
                   </SelectTrigger>
                   <SelectContent>
-                    {hospitals?.map((hospital: any) => (
+                    {hospitals.map((hospital: any) => (
                       <SelectItem key={hospital.id} value={hospital.id}>
                         {hospital.name}
                       </SelectItem>
@@ -359,6 +385,7 @@ export function PatientForm() {
                 )}
               </div>
             </div>
+
 
             {/* Form Actions */}
             <div className="flex items-center justify-end space-x-4 pt-6 border-t">

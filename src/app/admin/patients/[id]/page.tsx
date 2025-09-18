@@ -19,7 +19,11 @@ import {
   Stethoscope,
   Eye,
   Edit,
-  Trash2
+  Trash2,
+  Pill,
+  Plus,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react'
 
 interface Patient {
@@ -68,6 +72,35 @@ interface Visit {
       name: string
     }
   }
+  tests?: Array<{
+    id: string
+    name: string
+    description: string
+    status: string
+  }>
+  diseases?: Array<{
+    id: string
+    name: string
+    description: string
+  }>
+  treatments?: Array<{
+    id: string
+    name: string
+    description: string
+  }>
+  operations?: Array<{
+    id: string
+    name: string
+    description: string
+  }>
+  medications?: Array<{
+    id: string
+    name: string
+    dosage: string
+    frequency: string
+    duration: string
+    instructions: string
+  }>
 }
 
 export default function SimplePatientPage() {
@@ -79,6 +112,7 @@ export default function SimplePatientPage() {
   const [loading, setLoading] = useState(true)
   const [showVisitForm, setShowVisitForm] = useState(false)
   const [editingVisitId, setEditingVisitId] = useState<string | null>(null)
+  const [expandedVisits, setExpandedVisits] = useState<Set<string>>(new Set())
 
   // Fetch patient data
   const fetchPatient = async () => {
@@ -164,6 +198,22 @@ export default function SimplePatientPage() {
     setShowVisitForm(true)
   }
 
+  const toggleVisitExpansion = (visitId: string) => {
+    console.log('🔄 Toggling visit expansion for:', visitId)
+    console.log('🔄 Current expanded visits:', Array.from(expandedVisits))
+    
+    const newExpanded = new Set(expandedVisits)
+    if (newExpanded.has(visitId)) {
+      newExpanded.delete(visitId)
+      console.log('🔄 Collapsing visit:', visitId)
+    } else {
+      newExpanded.add(visitId)
+      console.log('🔄 Expanding visit:', visitId)
+    }
+    setExpandedVisits(newExpanded)
+    console.log('🔄 New expanded visits:', Array.from(newExpanded))
+  }
+
   const handleNewVisit = () => {
     setEditingVisitId(null)
     setShowVisitForm(true)
@@ -207,15 +257,23 @@ export default function SimplePatientPage() {
     return age
   }
 
+  // Separate visits and drafts
+  const completedVisits = visits.filter(v => v.status === 'COMPLETED')
+  const draftVisits = visits.filter(v => v.status === 'DRAFT')
+
   // Debug logging
   console.log('🔍 Current patient state:', patient)
   console.log('🔍 Hospital data:', patient?.hospital)
   // console.log('🔍 City data:', patient?.city) // City is accessed through hospital
   console.log('🔍 Hospital city:', patient?.hospital?.city)
-
-  // Separate visits and drafts
-  const completedVisits = visits.filter(v => v.status === 'COMPLETED')
-  const draftVisits = visits.filter(v => v.status === 'DRAFT')
+  console.log('🔍 Visits data:', visits)
+  console.log('🔍 Completed visits:', completedVisits)
+  if (completedVisits.length > 0) {
+    console.log('🔍 First visit details:', completedVisits[0])
+    console.log('🔍 First visit tests:', completedVisits[0]?.tests)
+    console.log('🔍 First visit diseases:', completedVisits[0]?.diseases)
+    console.log('🔍 First visit medications:', completedVisits[0]?.medications)
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -324,53 +382,196 @@ export default function SimplePatientPage() {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {completedVisits.map((visit) => (
-                      <div key={visit.id} className="p-4 border rounded-lg hover:bg-gray-50">
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center space-x-4 mb-2">
-                              <h4 className="font-semibold">
-                                {visit.doctor ? (
-                                  <>
-                                    د. {visit.doctor.firstName} {visit.doctor.lastName}
-                                    <span className="text-sm text-gray-500 mr-2">
-                                      - {visit.doctor.specialization}
-                                    </span>
-                                  </>
-                                ) : (
-                                  'لم يتم اختيار طبيب'
-                                )}
-                              </h4>
-                              <Badge className={getStatusColor(visit.status)}>
-                                {getStatusText(visit.status)}
-                              </Badge>
+                    {completedVisits.map((visit) => {
+                      const isExpanded = expandedVisits.has(visit.id)
+                      return (
+                        <div key={visit.id} className="p-4 border rounded-lg hover:bg-gray-50">
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center space-x-4 mb-2">
+                                <h4 className="font-semibold">
+                                  {visit.doctor ? (
+                                    <>
+                                      د. {visit.doctor.firstName} {visit.doctor.lastName}
+                                      <span className="text-sm text-gray-500 mr-2">
+                                        - {visit.doctor.specialization}
+                                      </span>
+                                    </>
+                                  ) : (
+                                    'لم يتم اختيار طبيب'
+                                  )}
+                                </h4>
+                                <Badge className={getStatusColor(visit.status)}>
+                                  {getStatusText(visit.status)}
+                                </Badge>
+                              </div>
+                              <p className="text-sm text-gray-600 mb-1">
+                                {formatDate(visit.scheduledAt)}
+                              </p>
+                              {visit.symptoms && (
+                                <p className="text-sm text-gray-600">
+                                  الأعراض: {visit.symptoms}
+                                </p>
+                              )}
+                              {visit.diagnosis && (
+                                <p className="text-sm text-gray-600">
+                                  التشخيص: {visit.diagnosis}
+                                </p>
+                              )}
                             </div>
-                            <p className="text-sm text-gray-600 mb-1">
-                              {formatDate(visit.scheduledAt)}
-                            </p>
-                            {visit.symptoms && (
-                              <p className="text-sm text-gray-600">
-                                الأعراض: {visit.symptoms}
-                              </p>
-                            )}
-                            {visit.diagnosis && (
-                              <p className="text-sm text-gray-600">
-                                التشخيص: {visit.diagnosis}
-                              </p>
-                            )}
+                            <div className="flex space-x-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => toggleVisitExpansion(visit.id)}
+                              >
+                                <Eye className="w-4 h-4 mr-1" />
+                                {isExpanded ? 'إخفاء التفاصيل' : 'عرض التفاصيل'}
+                                {isExpanded ? <ChevronUp className="w-4 h-4 mr-1" /> : <ChevronDown className="w-4 h-4 mr-1" />}
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleEditVisit(visit.id)}
+                              >
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                            </div>
                           </div>
-                          <div className="flex space-x-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleEditVisit(visit.id)}
-                            >
-                              <Edit className="w-4 h-4" />
-                            </Button>
-                          </div>
+                          
+                          {/* Expanded Details */}
+                          {isExpanded && (
+                            <div className="mt-4 pt-4 border-t border-gray-200">
+                              {(() => {
+                                console.log('🔍 Rendering expanded details for visit:', visit.id)
+                                console.log('🔍 Visit tests:', visit.tests)
+                                console.log('🔍 Visit diseases:', visit.diseases)
+                                console.log('🔍 Visit medications:', visit.medications)
+                                return null
+                              })()}
+                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {/* Tests */}
+                                {visit.tests && visit.tests.length > 0 && (
+                                  <div className="bg-blue-50 p-3 rounded-lg">
+                                    <h5 className="font-semibold text-blue-800 mb-2 flex items-center">
+                                      <TestTube className="w-4 h-4 mr-1" />
+                                      الفحوصات ({visit.tests.length})
+                                    </h5>
+                                    <div className="space-y-1">
+                                      {visit.tests.map((test, index) => (
+                                        <div key={index} className="text-sm text-blue-700">
+                                          • {test.name}
+                                          {test.description && (
+                                            <span className="text-gray-600 mr-2"> - {test.description}</span>
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Diseases */}
+                                {visit.diseases && visit.diseases.length > 0 && (
+                                  <div className="bg-red-50 p-3 rounded-lg">
+                                    <h5 className="font-semibold text-red-800 mb-2 flex items-center">
+                                      <Heart className="w-4 h-4 mr-1" />
+                                      الأمراض المشخصة ({visit.diseases.length})
+                                    </h5>
+                                    <div className="space-y-1">
+                                      {visit.diseases.map((disease, index) => (
+                                        <div key={index} className="text-sm text-red-700">
+                                          • {disease.name}
+                                          {disease.description && (
+                                            <span className="text-gray-600 mr-2"> - {disease.description}</span>
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Treatments */}
+                                {visit.treatments && visit.treatments.length > 0 && (
+                                  <div className="bg-green-50 p-3 rounded-lg">
+                                    <h5 className="font-semibold text-green-800 mb-2 flex items-center">
+                                      <Stethoscope className="w-4 h-4 mr-1" />
+                                      العلاجات ({visit.treatments.length})
+                                    </h5>
+                                    <div className="space-y-1">
+                                      {visit.treatments.map((treatment, index) => (
+                                        <div key={index} className="text-sm text-green-700">
+                                          • {treatment.name}
+                                          {treatment.description && (
+                                            <span className="text-gray-600 mr-2"> - {treatment.description}</span>
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Operations */}
+                                {visit.operations && visit.operations.length > 0 && (
+                                  <div className="bg-orange-50 p-3 rounded-lg">
+                                    <h5 className="font-semibold text-orange-800 mb-2 flex items-center">
+                                      <Activity className="w-4 h-4 mr-1" />
+                                      العمليات ({visit.operations.length})
+                                    </h5>
+                                    <div className="space-y-1">
+                                      {visit.operations.map((operation, index) => (
+                                        <div key={index} className="text-sm text-orange-700">
+                                          • {operation.name}
+                                          {operation.description && (
+                                            <span className="text-gray-600 mr-2"> - {operation.description}</span>
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Medications */}
+                                {visit.medications && visit.medications.length > 0 && (
+                                  <div className="bg-purple-50 p-3 rounded-lg">
+                                    <h5 className="font-semibold text-purple-800 mb-2 flex items-center">
+                                      <Pill className="w-4 h-4 mr-1" />
+                                      الأدوية الموصوفة ({visit.medications.length})
+                                    </h5>
+                                    <div className="space-y-2">
+                                      {visit.medications.map((medication, index) => (
+                                        <div key={index} className="text-sm text-purple-700 bg-white p-2 rounded border">
+                                          <div className="font-medium">{medication.name}</div>
+                                          {medication.dosage && (
+                                            <div className="text-gray-600">الجرعة: {medication.dosage}</div>
+                                          )}
+                                          {medication.frequency && (
+                                            <div className="text-gray-600">التكرار: {medication.frequency}</div>
+                                          )}
+                                          {medication.duration && (
+                                            <div className="text-gray-600">المدة: {medication.duration}</div>
+                                          )}
+                                          {medication.instructions && (
+                                            <div className="text-gray-600">التعليمات: {medication.instructions}</div>
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Notes */}
+                                {visit.notes && (
+                                  <div className="bg-gray-50 p-3 rounded-lg md:col-span-2 lg:col-span-3">
+                                    <h5 className="font-semibold text-gray-800 mb-2">ملاحظات إضافية</h5>
+                                    <p className="text-sm text-gray-700">{visit.notes}</p>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 )}
               </CardContent>

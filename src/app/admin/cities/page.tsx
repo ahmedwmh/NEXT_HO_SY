@@ -45,7 +45,6 @@ export default function CitiesPage() {
       }
       
       const data = await response.json()
-      console.log('Cities data received:', data)
       
       if (data.data && Array.isArray(data.data)) {
         setCities(data.data)

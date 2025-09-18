@@ -19,19 +19,10 @@ const maritalStatuses = ['أعزب', 'متزوج', 'مطلق', 'أرمل']
 const nationalities = ['عراقي', 'سوري', 'مصري', 'أردني', 'لبناني', 'سعودي', 'إماراتي', 'كويتي', 'قطري', 'بحريني', 'عماني', 'يمني', 'أخرى']
 
 export default function PatientsPage() {
-  console.log('🏗️ PatientsPage: Component rendering...')
   
   // Data fetching
   const { cities, hospitals, doctors, patients: dataPatients, loading: dataLoading, error: dataError } = useData()
   
-  console.log('📊 PatientsPage: Data state:', {
-    citiesCount: cities.length,
-    hospitalsCount: hospitals.length,
-    doctorsCount: doctors.length,
-    patientsCount: dataPatients.length,
-    dataLoading,
-    dataError
-  })
   
   // Patient operations
   const {
@@ -44,18 +35,12 @@ export default function PatientsPage() {
     setPatients,
   } = usePatients({
     onSuccess: () => {
-      console.log('✅ PatientsPage: Patient operation success')
       setShowAddForm(false)
       setEditingPatient(null)
       form.resetForm()
     },
   })
 
-  console.log('👥 PatientsPage: Patients state:', {
-    patientsCount: patients.length,
-    patientsLoading,
-    patientsError
-  })
 
   // Form management
   const form = usePatientForm()
@@ -74,10 +59,6 @@ export default function PatientsPage() {
 
   // Debug: Log when patients change
   useEffect(() => {
-    console.log('🔄 PatientsPage: DataPatients updated:', {
-      count: dataPatients.length,
-      patients: dataPatients.map(p => ({ id: p.id, name: `${p.firstName} ${p.lastName}`, number: p.patientNumber }))
-    })
   }, [dataPatients])
 
   const handleCityChange = (cityId: string) => {
@@ -231,11 +212,6 @@ export default function PatientsPage() {
     )
   }
 
-  console.log('🎯 PatientsPage: Rendering UniversalTable with:', {
-    patientsCount: dataPatients.length,
-    dataLoading,
-    patients: dataPatients.slice(0, 2) // Show first 2 patients for debugging
-  })
 
   return (
     <div className="space-y-6">

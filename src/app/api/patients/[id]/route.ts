@@ -35,6 +35,52 @@ export async function GET(
                 lastName: true,
                 specialization: true
               }
+            },
+            hospital: {
+              select: {
+                id: true,
+                name: true,
+                city: {
+                  select: {
+                    id: true,
+                    name: true
+                  }
+                }
+              }
+            },
+            tests: {
+              select: {
+                id: true,
+                name: true,
+                description: true,
+                status: true
+              }
+            },
+            treatments: {
+              select: {
+                id: true,
+                name: true,
+                description: true,
+                status: true
+              }
+            },
+            operations: {
+              select: {
+                id: true,
+                name: true,
+                description: true,
+                status: true
+              }
+            },
+            medications: {
+              select: {
+                id: true,
+                name: true,
+                dosage: true,
+                frequency: true,
+                duration: true,
+                instructions: true
+              }
             }
           },
           orderBy: {
@@ -116,9 +162,39 @@ export async function GET(
       )
     }
 
+    // Get diseases for each visit
+    const visitsWithDiseases = await Promise.all(
+      patient.visits.map(async (visit) => {
+        const diseases = await prisma.disease.findMany({
+          where: {
+            patientId: patient.id,
+            diagnosedAt: {
+              gte: new Date(visit.scheduledAt.getTime() - 24 * 60 * 60 * 1000), // 24 hours before visit
+              lte: new Date(visit.scheduledAt.getTime() + 24 * 60 * 60 * 1000)  // 24 hours after visit
+            }
+          },
+          select: {
+            id: true,
+            name: true,
+            description: true
+          }
+        })
+        
+        return {
+          ...visit,
+          diseases
+        }
+      })
+    )
+
+    const patientWithDiseases = {
+      ...patient,
+      visits: visitsWithDiseases
+    }
+
     return NextResponse.json({
       success: true,
-      data: patient
+      data: patientWithDiseases
     })
   } catch (error) {
     console.error('خطأ في جلب بيانات المريض:', error)

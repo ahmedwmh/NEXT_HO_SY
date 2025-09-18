@@ -100,7 +100,6 @@ export function ComprehensiveVisitForm({ patientId, patientName, isOpen, onClose
   // Load draft data when form opens
   useEffect(() => {
     if (isOpen) {
-      console.log('🔄 Form opened, loading draft data for patient:', patientId)
       loadDraftData()
     }
   }, [isOpen, patientId])
@@ -112,7 +111,6 @@ export function ComprehensiveVisitForm({ patientId, patientName, isOpen, onClose
       
       // Only load draft if not a new visit
       if (isNewVisit) {
-        console.log('🆕 New visit - not loading draft data')
         return
       }
 

@@ -74,32 +74,17 @@ class DataService {
       ...options,
     }
 
-    console.log('🚀 DataService Request:', {
-      url,
-      method: requestOptions.method || 'GET',
-      headers: requestOptions.headers,
-      body: requestOptions.body
-    })
 
     try {
       const response = await fetch(url, requestOptions)
       
-      console.log('📡 DataService Response:', {
-        url,
-        status: response.status,
-        statusText: response.statusText,
-        ok: response.ok,
-        headers: Object.fromEntries(response.headers.entries())
-      })
 
       if (!response.ok) {
         let errorData = {}
         try {
           const errorText = await response.text()
-          console.log('❌ Error Response Body:', errorText)
           errorData = JSON.parse(errorText)
         } catch (parseError) {
-          console.log('❌ Failed to parse error response:', parseError)
         }
         
         const errorMessage = (errorData as any).error || `HTTP error! status: ${response.status}`
@@ -115,12 +100,6 @@ class DataService {
       }
 
       const data = await response.json()
-      console.log('✅ DataService Success:', {
-        url,
-        dataType: Array.isArray(data) ? 'array' : typeof data,
-        dataLength: Array.isArray(data) ? data.length : 'N/A',
-        data: data
-      })
 
       return data
     } catch (error) {
@@ -135,21 +114,19 @@ class DataService {
 
   // Debug
   async debug(): Promise<any> {
-    console.log('🐛 DataService: Testing debug endpoint...')
     return this.request<any>('/debug')
   }
 
   // Cities
   async getCities(): Promise<City[]> {
-    console.log('🏙️ DataService: Getting cities...')
     const response = await this.request<ApiResponse<City[]>>('/cities')
     return response.data
   }
 
   // Hospitals
   async getHospitals(): Promise<Hospital[]> {
-    const response = await this.request<ApiResponse<Hospital[]>>('/hospitals')
-    return response.data
+    const response = await this.request<Hospital[]>('/hospitals')
+    return response
   }
 
   // Doctors
@@ -161,13 +138,6 @@ class DataService {
   // Patients
   async getPatients(): Promise<Patient[]> {
     const response = await this.request<ApiResponse<Patient[]>>('/patients')
-    console.log('🔍 DataService getPatients response:', {
-      hasResponse: !!response,
-      hasData: !!response.data,
-      dataType: typeof response.data,
-      dataLength: Array.isArray(response.data) ? response.data.length : 'not array',
-      response: response
-    })
     return response.data
   }
 

@@ -1,61 +1,153 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 
+// GET - جلب جميع العمليات
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const limit = parseInt(searchParams.get('limit') || '50')
-    const search = searchParams.get('search') || ''
+    const page = parseInt(searchParams.get('page') || '1')
+    const limit = parseInt(searchParams.get('limit') || '30')
+    const status = searchParams.get('status')
+    const search = searchParams.get('search')
+    const skip = (page - 1) * limit
 
-    const whereClause = search ? {
-      name: {
-        contains: search,
-        mode: 'insensitive' as const
-      }
-    } : {}
+    const whereClause: any = {}
+    
+    if (status) {
+      whereClause.status = status
+    }
+    
+    if (search) {
+      whereClause.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { description: { contains: search, mode: 'insensitive' } },
+        { patient: { firstName: { contains: search, mode: 'insensitive' } } },
+        { patient: { lastName: { contains: search, mode: 'insensitive' } } },
+        { patient: { patientNumber: { contains: search, mode: 'insensitive' } } },
+        { doctor: { firstName: { contains: search, mode: 'insensitive' } } },
+        { doctor: { lastName: { contains: search, mode: 'insensitive' } } },
+        { hospital: { name: { contains: search, mode: 'insensitive' } } },
+        { notes: { contains: search, mode: 'insensitive' } }
+      ]
+    }
 
-    const operations = await prisma.operation.findMany({
-      where: whereClause,
-      select: {
-        id: true,
-        name: true,
-        description: true,
-        status: true,
-        scheduledAt: true,
-        notes: true,
-        patient: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true
+    const [operations, total] = await Promise.all([
+      prisma.operation.findMany({
+        where: whereClause,
+        include: {
+          patient: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              patientNumber: true
+            }
+          },
+          doctor: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              specialization: true
+            }
+          },
+          hospital: {
+            select: {
+              id: true,
+              name: true
+            }
+          },
+          visit: {
+            select: {
+              id: true,
+              scheduledAt: true
+            }
           }
-        }
-      },
-      orderBy: { name: 'asc' },
-      take: limit
-    })
-
-    // Get unique operation names for dropdown
-    const uniqueOperations = operations.reduce((acc, operation) => {
-      if (!acc.find(o => o.name === operation.name)) {
-        acc.push({
-          id: operation.id,
-          name: operation.name,
-          description: operation.description
-        })
-      }
-      return acc
-    }, [] as Array<{id: string, name: string, description: string | null}>)
+        },
+        orderBy: { scheduledAt: 'desc' },
+        skip,
+        take: limit
+      }),
+      prisma.operation.count({ where: whereClause })
+    ])
 
     return NextResponse.json({
       success: true,
-      data: uniqueOperations,
-      count: uniqueOperations.length
+      data: operations,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit)
+      }
     })
   } catch (error) {
     console.error('Error fetching operations:', error)
     return NextResponse.json(
-      { success: false, error: 'Failed to fetch operations' },
+      { success: false, error: 'فشل في جلب العمليات' },
+      { status: 500 }
+    )
+  }
+}
+
+// POST - إنشاء عملية جديدة
+export async function POST(request: NextRequest) {
+  try {
+    const data = await request.json()
+    
+    const operation = await prisma.operation.create({
+      data: {
+        patientId: data.patientId,
+        doctorId: data.doctorId,
+        hospitalId: data.hospitalId,
+        visitId: data.visitId,
+        name: data.name,
+        description: data.description,
+        scheduledAt: new Date(data.scheduledAt),
+        status: data.status || 'SCHEDULED',
+        notes: data.notes,
+        images: data.images || []
+      },
+      include: {
+        patient: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            patientNumber: true
+          }
+        },
+        doctor: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            specialization: true
+          }
+        },
+        hospital: {
+          select: {
+            id: true,
+            name: true
+          }
+        },
+        visit: {
+          select: {
+            id: true,
+            scheduledAt: true
+          }
+        }
+      }
+    })
+
+    return NextResponse.json({
+      success: true,
+      data: operation
+    })
+  } catch (error) {
+    console.error('Error creating operation:', error)
+    return NextResponse.json(
+      { success: false, error: 'فشل في إنشاء العملية' },
       { status: 500 }
     )
   }

@@ -64,7 +64,6 @@ export async function uploadMedicalAttachment(
 
 export async function deleteFile(bucket: string, path: string): Promise<void> {
   // File delete functionality is disabled as Supabase is not configured
-  console.log(`File delete requested for ${bucket}/${path} - functionality disabled`)
 }
 
 export function getFileUrl(bucket: string, path: string): string {

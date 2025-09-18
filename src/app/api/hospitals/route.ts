@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 
+// جلب المستشفيات
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
@@ -11,113 +12,23 @@ export async function GET(request: NextRequest) {
     const hospitals = await prisma.hospital.findMany({
       where: whereClause,
       include: {
-        city: {
-          select: {
-            id: true,
-            name: true
-          }
-        },
+        city: true,
         doctors: {
-          select: {
-            id: true
-          }
+          select: { id: true }
         },
         staff: {
-          select: {
-            id: true
-          }
+          select: { id: true }
         },
         patients: {
-          select: {
-            id: true
-          }
+          select: { id: true }
         }
       },
-      orderBy: {
-        name: 'asc'
-      }
+      orderBy: { name: 'asc' }
     })
 
-    return NextResponse.json({ data: hospitals })
+    return NextResponse.json(hospitals)
   } catch (error) {
-    console.error('خطأ في جلب المستشفيات:', error)
-    return NextResponse.json(
-      { error: 'فشل في جلب المستشفيات' },
-      { status: 500 }
-    )
-  }
-}
-
-export async function POST(request: NextRequest) {
-  try {
-    const { name, address, phone, email, cityId } = await request.json()
-
-    if (!name || !name.trim() || !address || !address.trim() || !cityId) {
-      return NextResponse.json(
-        { error: 'اسم المستشفى والعنوان والمدينة مطلوبة' },
-        { status: 400 }
-      )
-    }
-
-    // Check if city exists
-    const city = await prisma.city.findUnique({
-      where: { id: cityId }
-    })
-
-    if (!city) {
-      return NextResponse.json(
-        { error: 'المدينة المحددة غير موجودة' },
-        { status: 400 }
-      )
-    }
-
-    const hospital = await prisma.hospital.create({
-      data: {
-        name: name.trim(),
-        address: address.trim(),
-        phone: phone?.trim() || null,
-        email: email?.trim() || null,
-        cityId
-      },
-      include: {
-        city: {
-          select: {
-            id: true,
-            name: true
-          }
-        },
-        doctors: {
-          select: {
-            id: true
-          }
-        },
-        staff: {
-          select: {
-            id: true
-          }
-        },
-        patients: {
-          select: {
-            id: true
-          }
-        }
-      }
-    })
-
-    return NextResponse.json(hospital, { status: 201 })
-  } catch (error) {
-    console.error('خطأ في إنشاء المستشفى:', error)
-    
-    if ((error as any).code === 'P2002') {
-      return NextResponse.json(
-        { error: 'هذا المستشفى موجود بالفعل' },
-        { status: 409 }
-      )
-    }
-
-    return NextResponse.json(
-      { error: 'فشل في إنشاء المستشفى' },
-      { status: 500 }
-    )
+    console.error('Error fetching hospitals:', error)
+    return NextResponse.json({ error: 'Failed to fetch hospitals' }, { status: 500 })
   }
 }
