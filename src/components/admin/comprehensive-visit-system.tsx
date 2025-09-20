@@ -100,6 +100,7 @@ export default function ComprehensiveVisitSystem({
   const [currentStep, setCurrentStep] = useState(1)
   const [isLoading, setIsLoading] = useState(false)
   const [savedSteps, setSavedSteps] = useState<Set<number>>(new Set())
+  const [isAddingItem, setIsAddingItem] = useState(false)
   const [visitData, setVisitData] = useState<VisitData>({
     scheduledAt: '',
     symptoms: '',
@@ -359,18 +360,28 @@ export default function ComprehensiveVisitSystem({
       const result = await response.json()
       console.log('📥 Raw API response:', JSON.stringify(result, null, 2))
       
-      const tests = result.data || []
-      console.log('🧪 Available tests count:', tests.length)
-      console.log('🧪 Available tests data:', JSON.stringify(tests, null, 2))
+      const allTests = result.data || []
+      console.log('🧪 All tests count:', allTests.length)
       
-      return tests
+      return allTests
     }
   })
+
+  // Filter tests by selected hospital
+  const filteredTests = availableTests?.filter((test: any) => 
+    !visitData.hospitalId || test.hospitalId === visitData.hospitalId
+  ) || []
+  
+  console.log('🧪 Debug - availableTests count:', availableTests?.length || 0)
+  console.log('🧪 Debug - visitData.hospitalId:', visitData.hospitalId)
+  console.log('🧪 Debug - filteredTests count:', filteredTests.length)
+  console.log('🧪 Debug - filteredTests sample:', filteredTests.slice(0, 3))
 
   const { data: availableDiseases, isLoading: isLoadingDiseases } = useQuery({
     queryKey: ['hospital-diseases'],
     queryFn: async () => {
       console.log('🦠 ===== FETCHING AVAILABLE DISEASES =====')
+      
       const response = await fetch('/api/hospital-diseases')
       
       if (!response.ok) {
@@ -378,15 +389,27 @@ export default function ComprehensiveVisitSystem({
       }
       
       const result = await response.json()
-      console.log('🦠 Available diseases count:', result.data?.length || 0)
-      return result.data || []
+      const allDiseases = result.data || []
+      console.log('🦠 All diseases count:', allDiseases.length)
+      
+      return allDiseases
     }
   })
+
+  // Filter diseases by selected hospital
+  const filteredDiseases = availableDiseases?.filter((disease: any) => 
+    !visitData.hospitalId || disease.hospitalId === visitData.hospitalId
+  ) || []
+  
+  console.log('🦠 Debug - availableDiseases count:', availableDiseases?.length || 0)
+  console.log('🦠 Debug - filteredDiseases count:', filteredDiseases.length)
+  console.log('🦠 Debug - filteredDiseases sample:', filteredDiseases.slice(0, 3))
 
   const { data: availableTreatments, isLoading: isLoadingTreatments } = useQuery({
     queryKey: ['hospital-treatments'],
     queryFn: async () => {
       console.log('💊 ===== FETCHING AVAILABLE TREATMENTS =====')
+      
       const response = await fetch('/api/hospital-treatments')
       
       if (!response.ok) {
@@ -394,15 +417,27 @@ export default function ComprehensiveVisitSystem({
       }
       
       const result = await response.json()
-      console.log('💊 Available treatments count:', result.data?.length || 0)
-      return result.data || []
+      const allTreatments = result.data || []
+      console.log('💊 All treatments count:', allTreatments.length)
+      
+      return allTreatments
     }
   })
+
+  // Filter treatments by selected hospital
+  const filteredTreatments = availableTreatments?.filter((treatment: any) => 
+    !visitData.hospitalId || treatment.hospitalId === visitData.hospitalId
+  ) || []
+  
+  console.log('💊 Debug - availableTreatments count:', availableTreatments?.length || 0)
+  console.log('💊 Debug - filteredTreatments count:', filteredTreatments.length)
+  console.log('💊 Debug - filteredTreatments sample:', filteredTreatments.slice(0, 3))
 
   const { data: availableOperations, isLoading: isLoadingOperations } = useQuery({
     queryKey: ['hospital-operations'],
     queryFn: async () => {
       console.log('🏥 ===== FETCHING AVAILABLE OPERATIONS =====')
+      
       const response = await fetch('/api/hospital-operations')
       
       if (!response.ok) {
@@ -410,21 +445,44 @@ export default function ComprehensiveVisitSystem({
       }
       
       const result = await response.json()
-      console.log('🏥 Available operations count:', result.data?.length || 0)
-      return result.data || []
+      const allOperations = result.data || []
+      console.log('🏥 All operations count:', allOperations.length)
+      
+      return allOperations
     }
   })
+
+  // Filter operations by selected hospital
+  const filteredOperations = availableOperations?.filter((operation: any) => 
+    !visitData.hospitalId || operation.hospitalId === visitData.hospitalId
+  ) || []
+  
+  console.log('🏥 Debug - availableOperations count:', availableOperations?.length || 0)
+  console.log('🏥 Debug - filteredOperations count:', filteredOperations.length)
+  console.log('🏥 Debug - filteredOperations sample:', filteredOperations.slice(0, 3))
 
   const { data: availableMedications, isLoading: isLoadingMedications } = useQuery({
     queryKey: ['medications'],
     queryFn: async () => {
       console.log('💉 ===== FETCHING AVAILABLE MEDICATIONS =====')
+      
       const response = await fetch('/api/medications')
       const result = await response.json()
-      console.log('💉 Available medications count:', result.data?.length || 0)
-      return result.data || []
+      const allMedications = result.data || []
+      console.log('💉 All medications count:', allMedications.length)
+      
+      return allMedications
     }
   })
+
+  // Filter medications by selected hospital (if medications have hospitalId)
+  const filteredMedications = availableMedications?.filter((medication: any) => 
+    !medication.hospitalId || !visitData.hospitalId || medication.hospitalId === visitData.hospitalId
+  ) || []
+  
+  console.log('💉 Debug - availableMedications count:', availableMedications?.length || 0)
+  console.log('💉 Debug - filteredMedications count:', filteredMedications.length)
+  console.log('💉 Debug - filteredMedications sample:', filteredMedications.slice(0, 3))
 
   // Filter hospitals based on selected city
   const filteredHospitals = hospitals?.filter((hospital: any) => 
@@ -624,16 +682,31 @@ export default function ComprehensiveVisitSystem({
 
   // Test management
   const addTest = (testName?: string, testDescription?: string) => {
+    if (isAddingItem) {
+      console.log('⚠️ Already adding item, skipping')
+      return
+    }
+    
     console.log('🧪 ===== ADDING TEST =====')
     console.log('📝 Test name:', testName)
     console.log('📄 Test description:', testDescription)
     console.log('📊 Current tests count:', visitData.tests.length)
     console.log('📊 Current tests:', JSON.stringify(visitData.tests, null, 2))
     
+    // Check if test already exists to prevent duplicates
+    const testExists = visitData.tests.some(test => test.name === testName)
+    if (testExists) {
+      console.log('⚠️ Test already exists, skipping addition')
+      return
+    }
+    
+    setIsAddingItem(true)
+    
     const newTest = {
       name: testName || '',
       description: testDescription || '',
-      scheduledAt: new Date().toISOString().split('T')[0]
+      scheduledAt: new Date().toISOString().split('T')[0],
+      hospitalId: visitData.hospitalId
     }
     
     console.log('🆕 New test to add:', JSON.stringify(newTest, null, 2))
@@ -649,6 +722,11 @@ export default function ComprehensiveVisitSystem({
     
     console.log('✅ Test added successfully!')
     console.log('📊 New tests count:', updatedTests.length)
+    
+    // Reset the adding state after a short delay
+    setTimeout(() => {
+      setIsAddingItem(false)
+    }, 500)
   }
 
   const updateTest = (index: number, field: keyof TestData, value: string) => {
@@ -690,12 +768,20 @@ export default function ComprehensiveVisitSystem({
     console.log('📄 Disease description:', diseaseDescription)
     console.log('📊 Current diseases count:', visitData.diseases.length)
     
+    // Check if disease already exists to prevent duplicates
+    const diseaseExists = visitData.diseases.some(disease => disease.name === diseaseName)
+    if (diseaseExists) {
+      console.log('⚠️ Disease already exists, skipping addition')
+      return
+    }
+    
     const newDisease = {
       name: diseaseName || '',
       description: diseaseDescription || '',
       diagnosedAt: new Date().toISOString().split('T')[0],
       severity: '',
-      status: 'Active'
+      status: 'Active',
+      hospitalId: visitData.hospitalId
     }
     
     console.log('🆕 New disease to add:', JSON.stringify(newDisease, null, 2))
@@ -731,11 +817,19 @@ export default function ComprehensiveVisitSystem({
     console.log('📄 Treatment description:', treatmentDescription)
     console.log('📊 Current treatments count:', visitData.treatments.length)
     
+    // Check if treatment already exists to prevent duplicates
+    const treatmentExists = visitData.treatments.some(treatment => treatment.name === treatmentName)
+    if (treatmentExists) {
+      console.log('⚠️ Treatment already exists, skipping addition')
+      return
+    }
+    
     const newTreatment = {
       name: treatmentName || '',
       description: treatmentDescription || '',
       scheduledAt: new Date().toISOString().split('T')[0],
-      notes: ''
+      notes: '',
+      hospitalId: visitData.hospitalId
     }
     
     console.log('🆕 New treatment to add:', JSON.stringify(newTreatment, null, 2))
@@ -771,11 +865,19 @@ export default function ComprehensiveVisitSystem({
     console.log('📄 Operation description:', operationDescription)
     console.log('📊 Current operations count:', visitData.operations.length)
     
+    // Check if operation already exists to prevent duplicates
+    const operationExists = visitData.operations.some(operation => operation.name === operationName)
+    if (operationExists) {
+      console.log('⚠️ Operation already exists, skipping addition')
+      return
+    }
+    
     const newOperation = {
       name: operationName || '',
       description: operationDescription || '',
       scheduledAt: new Date().toISOString().split('T')[0],
-      notes: ''
+      notes: '',
+      hospitalId: visitData.hospitalId
     }
     
     console.log('🆕 New operation to add:', JSON.stringify(newOperation, null, 2))
@@ -814,6 +916,13 @@ export default function ComprehensiveVisitSystem({
     console.log('📋 Instructions:', instructions)
     console.log('📊 Current medications count:', visitData.medications.length)
     
+    // Check if medication already exists to prevent duplicates
+    const medicationExists = visitData.medications.some(medication => medication.name === medicationName)
+    if (medicationExists) {
+      console.log('⚠️ Medication already exists, skipping addition')
+      return
+    }
+    
     const newMedication = {
       name: medicationName || '',
       dosage: dosage || '',
@@ -821,7 +930,8 @@ export default function ComprehensiveVisitSystem({
       duration: duration || '',
       instructions: instructions || '',
       startDate: new Date().toISOString().split('T')[0],
-      endDate: ''
+      endDate: '',
+      hospitalId: visitData.hospitalId
     }
     
     console.log('🆕 New medication to add:', JSON.stringify(newMedication, null, 2))
@@ -1084,8 +1194,18 @@ export default function ComprehensiveVisitSystem({
                 <Label className="text-sm font-medium text-gray-700 mb-2 block">
                   اختر من الفحوصات المتاحة:
                 </Label>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-32 overflow-y-auto border rounded-lg p-2">
-                  {availableTests?.map((test: any) => {
+                {!visitData.hospitalId ? (
+                  <div className="text-center py-8 text-gray-500 border rounded-lg bg-gray-50">
+                    <p>يرجى اختيار المستشفى أولاً لعرض الفحوصات المتاحة</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-32 overflow-y-auto border rounded-lg p-2">
+                    {filteredTests?.length === 0 ? (
+                      <div className="col-span-2 text-center py-4 text-gray-500">
+                        {visitData.hospitalId ? 'لا توجد فحوصات متاحة في هذا المستشفى' : 'يرجى اختيار المستشفى أولاً'}
+                      </div>
+                    ) : (
+                      filteredTests?.map((test: any) => {
                     const isSelected = visitData.tests.some(selectedTest => selectedTest.name === test.name)
                     console.log('🧪 Checking test:', test.name, 'isSelected:', isSelected)
                     console.log('🧪 Current visitData.tests:', visitData.tests.map(t => t.name))
@@ -1093,24 +1213,29 @@ export default function ComprehensiveVisitSystem({
                       <button
                         key={test.id}
                         onClick={() => addTest(test.name, test.description)}
-                        disabled={isSelected}
+                        disabled={isSelected || isAddingItem}
                         className={`text-right p-2 text-sm rounded border transition-colors ${
                           isSelected 
                             ? 'bg-green-50 border-green-300 text-green-700 cursor-not-allowed' 
+                            : isAddingItem
+                            ? 'bg-gray-50 border-gray-300 text-gray-500 cursor-not-allowed'
                             : 'hover:bg-blue-50 hover:border-blue-300'
                         }`}
                       >
                         <div className="font-medium flex items-center justify-between">
                           {test.name}
                           {isSelected && <span className="text-green-600">✓</span>}
+                          {isAddingItem && !isSelected && <span className="text-blue-600">...</span>}
                         </div>
                         {test.description && (
                           <div className="text-xs text-gray-500 mt-1">{test.description}</div>
                         )}
                       </button>
                     )
-                  })}
-                </div>
+                  })
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Current Tests */}
@@ -1208,8 +1333,18 @@ export default function ComprehensiveVisitSystem({
                 <Label className="text-sm font-medium text-gray-700 mb-2 block">
                   اختر من الأمراض المتاحة:
                 </Label>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-32 overflow-y-auto border rounded-lg p-2">
-                  {availableDiseases?.map((disease: any) => {
+                {!visitData.hospitalId ? (
+                  <div className="text-center py-8 text-gray-500 border rounded-lg bg-gray-50">
+                    <p>يرجى اختيار المستشفى أولاً لعرض الأمراض المتاحة</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-32 overflow-y-auto border rounded-lg p-2">
+                    {filteredDiseases?.length === 0 ? (
+                      <div className="col-span-2 text-center py-4 text-gray-500">
+                        {visitData.hospitalId ? 'لا توجد أمراض متاحة في هذا المستشفى' : 'يرجى اختيار المستشفى أولاً'}
+                      </div>
+                    ) : (
+                      filteredDiseases?.map((disease: any) => {
                     const isSelected = visitData.diseases.some(selectedDisease => selectedDisease.name === disease.name)
                     console.log('🦠 Checking disease:', disease.name, 'isSelected:', isSelected)
                     console.log('🦠 Current visitData.diseases:', visitData.diseases.map(d => d.name))
@@ -1233,8 +1368,10 @@ export default function ComprehensiveVisitSystem({
                         )}
                       </button>
                     )
-                  })}
-                </div>
+                  })
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Current Diseases */}
@@ -1346,8 +1483,18 @@ export default function ComprehensiveVisitSystem({
                 <Label className="text-sm font-medium text-gray-700 mb-2 block">
                   اختر من العلاجات المتاحة:
                 </Label>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-32 overflow-y-auto border rounded-lg p-2">
-                  {availableTreatments?.map((treatment: any) => {
+                {!visitData.hospitalId ? (
+                  <div className="text-center py-8 text-gray-500 border rounded-lg bg-gray-50">
+                    <p>يرجى اختيار المستشفى أولاً لعرض العلاجات المتاحة</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-32 overflow-y-auto border rounded-lg p-2">
+                    {filteredTreatments?.length === 0 ? (
+                      <div className="col-span-2 text-center py-4 text-gray-500">
+                        {visitData.hospitalId ? 'لا توجد علاجات متاحة في هذا المستشفى' : 'يرجى اختيار المستشفى أولاً'}
+                      </div>
+                    ) : (
+                      filteredTreatments?.map((treatment: any) => {
                     const isSelected = visitData.treatments.some(selectedTreatment => selectedTreatment.name === treatment.name)
                     console.log('💊 Checking treatment:', treatment.name, 'isSelected:', isSelected)
                     console.log('💊 Current visitData.treatments:', visitData.treatments.map(t => t.name))
@@ -1371,8 +1518,10 @@ export default function ComprehensiveVisitSystem({
                         )}
                       </button>
                     )
-                  })}
-                </div>
+                  })
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Current Treatments */}
@@ -1472,8 +1621,18 @@ export default function ComprehensiveVisitSystem({
                   <Label className="text-sm font-medium text-gray-700 mb-2 block">
                     اختر من العمليات المتاحة:
                   </Label>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-32 overflow-y-auto border rounded-lg p-2">
-                    {availableOperations?.map((operation: any) => {
+                  {!visitData.hospitalId ? (
+                    <div className="text-center py-8 text-gray-500 border rounded-lg bg-gray-50">
+                      <p>يرجى اختيار المستشفى أولاً لعرض العمليات المتاحة</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-32 overflow-y-auto border rounded-lg p-2">
+                      {filteredOperations?.length === 0 ? (
+                        <div className="col-span-2 text-center py-4 text-gray-500">
+                          {visitData.hospitalId ? 'لا توجد عمليات متاحة في هذا المستشفى' : 'يرجى اختيار المستشفى أولاً'}
+                        </div>
+                      ) : (
+                        filteredOperations?.map((operation: any) => {
                       const isSelected = visitData.operations.some(selectedOperation => selectedOperation.name === operation.name)
                       console.log('🏥 Checking operation:', operation.name, 'isSelected:', isSelected)
                       console.log('🏥 Current visitData.operations:', visitData.operations.map(o => o.name))
@@ -1494,11 +1653,13 @@ export default function ComprehensiveVisitSystem({
                           </div>
                           {operation.description && (
                             <div className="text-xs text-gray-500 mt-1">{operation.description}</div>
-                          )}
-                        </button>
-                      )
-                    })}
-                  </div>
+                        )}
+                      </button>
+                    )
+                  })
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Current Operations */}
@@ -1594,8 +1755,18 @@ export default function ComprehensiveVisitSystem({
                   <Label className="text-sm font-medium text-gray-700 mb-2 block">
                     اختر من الأدوية المتاحة:
                   </Label>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-32 overflow-y-auto border rounded-lg p-2">
-                    {availableMedications?.map((medication: any) => {
+                  {!visitData.hospitalId ? (
+                    <div className="text-center py-8 text-gray-500 border rounded-lg bg-gray-50">
+                      <p>يرجى اختيار المستشفى أولاً لعرض الأدوية المتاحة</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-32 overflow-y-auto border rounded-lg p-2">
+                      {filteredMedications?.length === 0 ? (
+                        <div className="col-span-2 text-center py-4 text-gray-500">
+                          {visitData.hospitalId ? 'لا توجد أدوية متاحة في هذا المستشفى' : 'يرجى اختيار المستشفى أولاً'}
+                        </div>
+                      ) : (
+                        filteredMedications?.map((medication: any) => {
                       const isSelected = visitData.medications.some(selectedMedication => selectedMedication.name === medication.name)
                       console.log('💉 Checking medication:', medication.name, 'isSelected:', isSelected)
                       console.log('💉 Current visitData.medications:', visitData.medications.map(m => m.name))
@@ -1619,11 +1790,13 @@ export default function ComprehensiveVisitSystem({
                           )}
                           {medication.frequency && (
                             <div className="text-xs text-gray-500">التكرار: {medication.frequency}</div>
-                          )}
-                        </button>
-                      )
-                    })}
-                  </div>
+                        )}
+                      </button>
+                    )
+                  })
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Current Medications */}
