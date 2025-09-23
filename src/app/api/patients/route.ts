@@ -5,6 +5,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const idNumber = searchParams.get('idNumber')
+    const hospitalId = searchParams.get('hospitalId')
     
     // If checking for ID number uniqueness
     if (idNumber) {
@@ -19,7 +20,16 @@ export async function GET(request: NextRequest) {
       })
     }
 
+    // Build where clause based on filters
+    const whereClause: any = {}
+    
+    // Filter by hospital if specified
+    if (hospitalId) {
+      whereClause.hospitalId = hospitalId
+    }
+
     const patients = await prisma.patient.findMany({
+      where: whereClause,
       include: {
         hospital: {
           include: {

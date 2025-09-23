@@ -6,8 +6,17 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const cityId = searchParams.get('cityId')
+    const hospitalId = searchParams.get('hospitalId')
 
-    const whereClause = cityId ? { cityId } : {}
+    let whereClause: any = {}
+    
+    if (cityId) {
+      whereClause.cityId = cityId
+    }
+    
+    if (hospitalId) {
+      whereClause.id = hospitalId
+    }
 
     const hospitals = await prisma.hospital.findMany({
       where: whereClause,
@@ -26,7 +35,15 @@ export async function GET(request: NextRequest) {
       orderBy: { name: 'asc' }
     })
 
-    return NextResponse.json(hospitals)
+    return NextResponse.json({
+      data: hospitals,
+      pagination: {
+        page: 1,
+        limit: hospitals.length,
+        total: hospitals.length,
+        totalPages: 1
+      }
+    })
   } catch (error) {
     console.error('Error fetching hospitals:', error)
     return NextResponse.json({ error: 'Failed to fetch hospitals' }, { status: 500 })

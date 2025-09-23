@@ -1,6 +1,57 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const { id } = params
+
+    const doctor = await prisma.doctor.findUnique({
+      where: { id },
+      include: {
+        hospital: {
+          include: {
+            city: {
+              select: {
+                id: true,
+                name: true
+              }
+            }
+          }
+        },
+        user: {
+          select: {
+            id: true,
+            email: true,
+            role: true
+          }
+        }
+      }
+    })
+
+    if (!doctor) {
+      return NextResponse.json(
+        { error: 'الطبيب غير موجود' },
+        { status: 404 }
+      )
+    }
+
+    return NextResponse.json({
+      doctor,
+      hospital: doctor.hospital,
+      city: doctor.hospital.city
+    })
+  } catch (error) {
+    console.error('خطأ في جلب بيانات الطبيب:', error)
+    return NextResponse.json(
+      { error: 'فشل في جلب بيانات الطبيب' },
+      { status: 500 }
+    )
+  }
+}
+
 export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }

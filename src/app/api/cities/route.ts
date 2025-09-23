@@ -7,9 +7,17 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '30')
     const skip = (page - 1) * limit
+    const cityId = searchParams.get('cityId')
+
+    let whereClause: any = {}
+    
+    if (cityId) {
+      whereClause.id = cityId
+    }
 
     const [cities, total] = await Promise.all([
       prisma.city.findMany({
+        where: whereClause,
         include: {
           hospitals: {
             select: {
@@ -27,7 +35,7 @@ export async function GET(request: NextRequest) {
         skip,
         take: limit
       }),
-      prisma.city.count()
+      prisma.city.count({ where: whereClause })
     ])
 
     console.log('🏙️ Cities API: Database query successful:', {

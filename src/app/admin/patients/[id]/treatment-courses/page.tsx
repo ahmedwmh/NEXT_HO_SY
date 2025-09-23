@@ -166,7 +166,7 @@ export default function TreatmentCoursesPage() {
         body: JSON.stringify({
           ...newCourse,
           patientId,
-          hospitalId: hospitalTreatments.find(t => t.id === newCourse.hospitalTreatmentId)?.hospitalId || '',
+          hospitalId: (hospitalTreatments.find(t => t.id === newCourse.hospitalTreatmentId) as any)?.hospitalId || '',
           hospitalTreatmentId: newCourse.hospitalTreatmentId,
           doctorId: newCourse.doctorId
         })
