@@ -10,9 +10,23 @@ export async function GET(request: NextRequest) {
     const severity = searchParams.get('severity')
     const status = searchParams.get('status')
     const search = searchParams.get('search')
+    const patientId = searchParams.get('patientId')
+    const startDate = searchParams.get('startDate')
+    const endDate = searchParams.get('endDate')
     const skip = (page - 1) * limit
 
     const whereClause: any = {}
+    
+    if (patientId) {
+      whereClause.patientId = patientId
+    }
+    
+    if (startDate && endDate) {
+      whereClause.diagnosedAt = {
+        gte: new Date(startDate),
+        lte: new Date(endDate)
+      }
+    }
     
     if (severity) {
       whereClause.severity = severity

@@ -5,8 +5,9 @@ import { useParams } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+// Simplified layout: remove Tabs for clearer UX
 import ComprehensiveVisitSystem from '@/components/admin/comprehensive-visit-system'
+import PatientMedicalDetails from '@/components/admin/patient-medical-details'
 import { 
   User, 
   Phone, 
@@ -150,6 +151,23 @@ export default function SimplePatientPage() {
       if (result.data) {
         setVisits(result.data)
         console.log('✅ Visits loaded:', result.data.length)
+        
+        // Log detailed visit data for debugging
+        result.data.forEach((visit: any, index: number) => {
+          console.log(`🔍 Visit ${index + 1} (${visit.id}):`, {
+            status: visit.status,
+            tests: visit.tests?.length || 0,
+            diseases: visit.diseases?.length || 0,
+            treatments: visit.treatments?.length || 0,
+            operations: visit.operations?.length || 0,
+            medications: visit.medications?.length || 0,
+            testsData: visit.tests,
+            diseasesData: visit.diseases,
+            treatmentsData: visit.treatments,
+            operationsData: visit.operations,
+            medicationsData: visit.medications
+          })
+        })
       }
     } catch (error) {
       console.error('خطأ في جلب الزيارات:', error)
@@ -359,15 +377,9 @@ export default function SimplePatientPage() {
           </div>
         </div>
 
-        {/* Tabs */}
-        <Tabs defaultValue="visits" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="visits">الزيارات المكتملة</TabsTrigger>
-            <TabsTrigger value="drafts">المسودات</TabsTrigger>
-          </TabsList>
-
+        {/* Single-page sections for clarity */}
+        <div className="space-y-6">
           {/* Completed Visits */}
-          <TabsContent value="visits" className="space-y-4">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center">
@@ -450,6 +462,17 @@ export default function SimplePatientPage() {
                                 return null
                               })()}
                               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {/* Debug Info */}
+                                {(() => {
+                                  console.log('🔍 Rendering expanded details for visit:', visit.id)
+                                  console.log('🔍 Visit tests:', visit.tests)
+                                  console.log('🔍 Visit diseases:', visit.diseases)
+                                  console.log('🔍 Visit treatments:', visit.treatments)
+                                  console.log('🔍 Visit operations:', visit.operations)
+                                  console.log('🔍 Visit medications:', visit.medications)
+                                  console.log('🔍 Visit treatmentCourses:', (visit as any).treatmentCourses)
+                                  return null
+                                })()}
                                 {/* Tests */}
                                 {visit.tests && visit.tests.length > 0 && (
                                   <div className="bg-blue-50 p-3 rounded-lg">
@@ -457,12 +480,15 @@ export default function SimplePatientPage() {
                                       <TestTube className="w-4 h-4 mr-1" />
                                       الفحوصات ({visit.tests.length})
                                     </h5>
-                                    <div className="space-y-1">
+                                    <div className="space-y-2">
                                       {visit.tests.map((test, index) => (
-                                        <div key={index} className="text-sm text-blue-700">
-                                          • {test.name}
+                                        <div key={index} className="text-sm text-blue-700 bg-white p-2 rounded border">
+                                          <div className="font-medium">{test.name}</div>
                                           {test.description && (
-                                            <span className="text-gray-600 mr-2"> - {test.description}</span>
+                                            <div className="text-gray-600">الوصف: {test.description}</div>
+                                          )}
+                                          {test.status && (
+                                            <div className="text-gray-600">الحالة: {test.status}</div>
                                           )}
                                         </div>
                                       ))}
@@ -477,12 +503,18 @@ export default function SimplePatientPage() {
                                       <Heart className="w-4 h-4 mr-1" />
                                       الأمراض المشخصة ({visit.diseases.length})
                                     </h5>
-                                    <div className="space-y-1">
+                                    <div className="space-y-2">
                                       {visit.diseases.map((disease, index) => (
-                                        <div key={index} className="text-sm text-red-700">
-                                          • {disease.name}
+                                        <div key={index} className="text-sm text-red-700 bg-white p-2 rounded border">
+                                          <div className="font-medium">{disease.name}</div>
                                           {disease.description && (
-                                            <span className="text-gray-600 mr-2"> - {disease.description}</span>
+                                            <div className="text-gray-600">الوصف: {disease.description}</div>
+                                          )}
+                                          {(disease as any).severity && (
+                                            <div className="text-gray-600">الشدة: {(disease as any).severity}</div>
+                                          )}
+                                          {(disease as any).status && (
+                                            <div className="text-gray-600">الحالة: {(disease as any).status}</div>
                                           )}
                                         </div>
                                       ))}
@@ -497,12 +529,15 @@ export default function SimplePatientPage() {
                                       <Stethoscope className="w-4 h-4 mr-1" />
                                       العلاجات ({visit.treatments.length})
                                     </h5>
-                                    <div className="space-y-1">
+                                    <div className="space-y-2">
                                       {visit.treatments.map((treatment, index) => (
-                                        <div key={index} className="text-sm text-green-700">
-                                          • {treatment.name}
+                                        <div key={index} className="text-sm text-green-700 bg-white p-2 rounded border">
+                                          <div className="font-medium">{treatment.name}</div>
                                           {treatment.description && (
-                                            <span className="text-gray-600 mr-2"> - {treatment.description}</span>
+                                            <div className="text-gray-600">الوصف: {treatment.description}</div>
+                                          )}
+                                          {(treatment as any).status && (
+                                            <div className="text-gray-600">الحالة: {(treatment as any).status}</div>
                                           )}
                                         </div>
                                       ))}
@@ -517,12 +552,15 @@ export default function SimplePatientPage() {
                                       <Activity className="w-4 h-4 mr-1" />
                                       العمليات ({visit.operations.length})
                                     </h5>
-                                    <div className="space-y-1">
+                                    <div className="space-y-2">
                                       {visit.operations.map((operation, index) => (
-                                        <div key={index} className="text-sm text-orange-700">
-                                          • {operation.name}
+                                        <div key={index} className="text-sm text-orange-700 bg-white p-2 rounded border">
+                                          <div className="font-medium">{operation.name}</div>
                                           {operation.description && (
-                                            <span className="text-gray-600 mr-2"> - {operation.description}</span>
+                                            <div className="text-gray-600">الوصف: {operation.description}</div>
+                                          )}
+                                          {(operation as any).status && (
+                                            <div className="text-gray-600">الحالة: {(operation as any).status}</div>
                                           )}
                                         </div>
                                       ))}
@@ -559,11 +597,51 @@ export default function SimplePatientPage() {
                                   </div>
                                 )}
 
+                                {/* Treatment Courses */}
+                                {(visit as any).treatmentCourses && (visit as any).treatmentCourses.length > 0 && (
+                                  <div className="bg-teal-50 p-3 rounded-lg">
+                                    <h5 className="font-semibold text-teal-800 mb-2 flex items-center">
+                                      <Stethoscope className="w-4 h-4 mr-1" />
+                                      الكورسات العلاجية ({(visit as any).treatmentCourses.length})
+                                    </h5>
+                                    <div className="space-y-2">
+                                      {(visit as any).treatmentCourses.map((course: any, index: number) => (
+                                        <div key={index} className="text-sm text-teal-700 bg-white p-2 rounded border">
+                                          <div className="font-medium">{course.courseName || course.name}</div>
+                                          {course.description && (
+                                            <div className="text-gray-600">الوصف: {course.description}</div>
+                                          )}
+                                          {course.totalQuantity && (
+                                            <div className="text-gray-600">الكمية الإجمالية: {course.totalQuantity}</div>
+                                          )}
+                                          {course.status && (
+                                            <div className="text-gray-600">الحالة: {course.status}</div>
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
                                 {/* Notes */}
                                 {visit.notes && (
                                   <div className="bg-gray-50 p-3 rounded-lg md:col-span-2 lg:col-span-3">
                                     <h5 className="font-semibold text-gray-800 mb-2">ملاحظات إضافية</h5>
                                     <p className="text-sm text-gray-700">{visit.notes}</p>
+                                  </div>
+                                )}
+                                {/* No details fallback */}
+                                {!(
+                                  (visit.tests && visit.tests.length > 0) ||
+                                  (visit.diseases && visit.diseases.length > 0) ||
+                                  (visit.treatments && visit.treatments.length > 0) ||
+                                  (visit.operations && visit.operations.length > 0) ||
+                                  (visit.medications && visit.medications.length > 0) ||
+                                  ((visit as any).treatmentCourses && (visit as any).treatmentCourses.length > 0) ||
+                                  visit.notes
+                                ) && (
+                                  <div className="bg-white border rounded-lg p-4 md:col-span-2 lg:col-span-3 text-center text-gray-600">
+                                    لا توجد تفاصيل إضافية لهذه الزيارة
                                   </div>
                                 )}
                               </div>
@@ -576,10 +654,7 @@ export default function SimplePatientPage() {
                 )}
               </CardContent>
             </Card>
-          </TabsContent>
-
           {/* Draft Visits */}
-          <TabsContent value="drafts" className="space-y-4">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center">
@@ -644,8 +719,9 @@ export default function SimplePatientPage() {
                 )}
               </CardContent>
             </Card>
-          </TabsContent>
-        </Tabs>
+          {/* Medical Details */}
+            <PatientMedicalDetails patientId={patientId} />
+        </div>
 
         {/* Comprehensive Visit System Modal */}
         {showVisitForm && (

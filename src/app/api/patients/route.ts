@@ -1,8 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url)
+    const idNumber = searchParams.get('idNumber')
+    
+    // If checking for ID number uniqueness
+    if (idNumber) {
+      const existingPatient = await prisma.patient.findFirst({
+        where: { idNumber: idNumber.trim() },
+        select: { id: true, firstName: true, lastName: true, patientNumber: true }
+      })
+      
+      return NextResponse.json({
+        exists: !!existingPatient,
+        patient: existingPatient
+      })
+    }
+
     const patients = await prisma.patient.findMany({
       include: {
         hospital: {
@@ -63,7 +79,8 @@ export async function POST(request: NextRequest) {
       maritalStatus,
       occupation,
       notes,
-      hospitalId
+      hospitalId,
+      selectedTests
     } = await request.json()
 
     if (!firstName || !lastName || !dateOfBirth || !gender || !phone || !address || !emergencyContact || !cityId || !hospitalId) {
@@ -71,6 +88,20 @@ export async function POST(request: NextRequest) {
         { error: 'جميع الحقول المطلوبة يجب ملؤها' },
         { status: 400 }
       )
+    }
+
+    // Check if ID number already exists (if provided)
+    if (idNumber && idNumber.trim()) {
+      const existingPatient = await prisma.patient.findFirst({
+        where: { idNumber: idNumber.trim() }
+      })
+      
+      if (existingPatient) {
+        return NextResponse.json(
+          { error: `رقم الهوية الوطنية ${idNumber} مستخدم بالفعل للمريض ${existingPatient.firstName} ${existingPatient.lastName} (${existingPatient.patientNumber})` },
+          { status: 409 }
+        )
+      }
     }
 
     // Check if city exists
@@ -177,6 +208,31 @@ export async function POST(request: NextRequest) {
         }
       }
     })
+
+    // Create tests if selected
+    if (selectedTests && Array.isArray(selectedTests) && selectedTests.length > 0) {
+      // Get a default doctor for the hospital (you might want to modify this logic)
+      const defaultDoctor = await prisma.doctor.findFirst({
+        where: { hospitalId }
+      })
+
+      if (defaultDoctor) {
+        const testData = selectedTests.map((test: any) => ({
+          patientId: patient.id,
+          doctorId: defaultDoctor.id,
+          hospitalId: hospitalId,
+          name: test.name,
+          description: test.description || null,
+          scheduledAt: new Date(), // Schedule for today
+          status: 'SCHEDULED' as const,
+          notes: `فحص مبدئي للمريض الجديد - ${patient.patientNumber}`
+        }))
+
+        await prisma.test.createMany({
+          data: testData
+        })
+      }
+    }
 
     return NextResponse.json(patient, { status: 201 })
   } catch (error) {

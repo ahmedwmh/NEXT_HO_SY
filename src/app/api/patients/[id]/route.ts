@@ -239,6 +239,23 @@ export async function PUT(
       }
     }
 
+    // Check if ID number already exists (if provided and different from current)
+    if (patientData.idNumber && patientData.idNumber.trim()) {
+      const existingPatient = await prisma.patient.findFirst({
+        where: { 
+          idNumber: patientData.idNumber.trim(),
+          id: { not: params.id } // Exclude current patient
+        }
+      })
+      
+      if (existingPatient) {
+        return NextResponse.json(
+          { error: `رقم الهوية الوطنية ${patientData.idNumber} مستخدم بالفعل للمريض ${existingPatient.firstName} ${existingPatient.lastName} (${existingPatient.patientNumber})` },
+          { status: 409 }
+        )
+      }
+    }
+
     // Process allergies field if it's an array
     const processedPatientData = {
       ...patientData,

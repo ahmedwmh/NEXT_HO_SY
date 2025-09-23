@@ -4,11 +4,9 @@ import { type Patient, type Hospital, type Doctor } from '@/lib/services/data-se
 interface PatientFormData {
   firstName: string
   lastName: string
-  middleName: string
   dateOfBirth: string
   gender: string
   phone: string
-  email: string
   address: string
   emergencyContact: string
   bloodType: string
@@ -16,25 +14,22 @@ interface PatientFormData {
   medicalHistory: string
   nationality: string
   idNumber: string
-  passportNumber: string
   cityId: string
   hospitalId: string
   doctorId: string
   insuranceNumber: string
-  insuranceCompany: string
   maritalStatus: string
   occupation: string
   notes: string
+  selectedTests?: any[]
 }
 
 const initialFormData: PatientFormData = {
   firstName: '',
   lastName: '',
-  middleName: '',
   dateOfBirth: '',
   gender: '',
   phone: '',
-  email: '',
   address: '',
   emergencyContact: '',
   bloodType: '',
@@ -42,15 +37,14 @@ const initialFormData: PatientFormData = {
   medicalHistory: '',
   nationality: '',
   idNumber: '',
-  passportNumber: '',
   cityId: '',
   hospitalId: '',
   doctorId: '',
   insuranceNumber: '',
-  insuranceCompany: '',
   maritalStatus: '',
   occupation: '',
   notes: '',
+  selectedTests: []
 }
 
 export function usePatientForm() {
@@ -72,11 +66,9 @@ export function usePatientForm() {
     setFormData({
       firstName: patient.firstName,
       lastName: patient.lastName,
-      middleName: patient.middleName || '',
       dateOfBirth: patient.dateOfBirth.split('T')[0],
       gender: patient.gender,
       phone: patient.phone,
-      email: patient.email || '',
       address: patient.address,
       emergencyContact: patient.emergencyContact,
       bloodType: patient.bloodType,
@@ -84,15 +76,14 @@ export function usePatientForm() {
       medicalHistory: patient.medicalHistory || '',
       nationality: patient.nationality || '',
       idNumber: patient.idNumber || '',
-      passportNumber: patient.passportNumber || '',
       cityId: patient.hospital?.city?.id || '',
       hospitalId: patient.hospitalId,
       doctorId: '', // This would need to be determined based on your data structure
       insuranceNumber: patient.insuranceNumber || '',
-      insuranceCompany: patient.insuranceCompany || '',
       maritalStatus: patient.maritalStatus || '',
       occupation: patient.occupation || '',
       notes: patient.notes || '',
+      selectedTests: []
     })
     setSelectedCityId(patient.hospital?.city?.id || '')
     setSelectedHospitalId(patient.hospitalId)
@@ -113,6 +104,7 @@ export function usePatientForm() {
 
   const handleHospitalChange = useCallback(
     (hospitalId: string, doctors: Doctor[]) => {
+      console.log('🏥 usePatientForm: Hospital changed to:', hospitalId)
       setSelectedHospitalId(hospitalId)
       setFormData(prev => ({ ...prev, hospitalId, doctorId: '' }))
       

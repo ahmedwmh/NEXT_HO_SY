@@ -15,6 +15,8 @@ export async function POST(request: NextRequest) {
       cityId,
       status = 'DRAFT',
       tests = [],
+      diseases = [],
+      treatmentCourses = [],
       treatments = [],
       operations = [],
       medications = [],
@@ -47,13 +49,43 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Resolve hospital/doctor/city context robustly
+    const extractId = (value?: string | null) => {
+      if (!value) return null
+      // If value looks like "name-someid" take the last segment
+      if (value.includes('-')) {
+        const parts = value.split('-')
+        const last = parts[parts.length - 1]
+        return last || value
+      }
+      return value
+    }
+
+    let normalizedHospitalId = extractId(hospitalId)
+
+    // Verify hospital exists; if not, fall back to patient's hospital
+    let hospitalRecord = normalizedHospitalId
+      ? await prisma.hospital.findUnique({ where: { id: normalizedHospitalId } })
+      : null
+
+    if (!hospitalRecord) {
+      const patient = await prisma.patient.findUnique({ where: { id: patientId } })
+      if (patient) {
+        normalizedHospitalId = patient.hospitalId
+        hospitalRecord = await prisma.hospital.findUnique({ where: { id: patient.hospitalId } })
+      }
+    }
+
+    // Determine city from hospital if not provided/valid
+    const normalizedCityId = hospitalRecord?.cityId || cityId || null
+
     // Create visit with basic data first
     const visit = await prisma.visit.create({
       data: {
         patientId,
         doctorId: doctorId || null,
-        hospitalId: hospitalId || null,
-        cityId: cityId || null,
+        hospitalId: normalizedHospitalId || null,
+        cityId: normalizedCityId,
         scheduledAt: new Date(scheduledAt),
         status: status as any,
         notes: notes || '',
@@ -70,12 +102,26 @@ export async function POST(request: NextRequest) {
           visitId: visit.id,
           patientId,
           doctorId: doctorId || 'temp-doctor',
-          hospitalId: hospitalId || 'temp-hospital',
+          hospitalId: normalizedHospitalId || 'temp-hospital',
           name: test.name,
           description: test.description || '',
-          scheduledAt: new Date(test.scheduledAt),
+          scheduledAt: new Date(test.scheduledAt || scheduledAt),
           results: test.results || null,
           notes: test.notes || null
+        }))
+      })
+    }
+
+    if (status === 'COMPLETED' && diseases && diseases.length > 0) {
+      await prisma.disease.createMany({
+        data: diseases.map((d: any) => ({
+          patientId,
+          name: d.name,
+          description: d.description || '',
+          diagnosedAt: new Date(d.diagnosedAt || scheduledAt),
+          severity: d.severity || null,
+          status: d.status || 'Active',
+          notes: d.notes || null,
         }))
       })
     }
@@ -86,10 +132,10 @@ export async function POST(request: NextRequest) {
           visitId: visit.id,
           patientId,
           doctorId: doctorId || 'temp-doctor',
-          hospitalId: hospitalId || 'temp-hospital',
+          hospitalId: normalizedHospitalId || 'temp-hospital',
           name: treatment.name,
           description: treatment.description || '',
-          scheduledAt: new Date(treatment.scheduledAt),
+          scheduledAt: new Date(treatment.scheduledAt || scheduledAt),
           notes: treatment.notes || null
         }))
       })
@@ -101,10 +147,10 @@ export async function POST(request: NextRequest) {
           visitId: visit.id,
           patientId,
           doctorId: doctorId || 'temp-doctor',
-          hospitalId: hospitalId || 'temp-hospital',
+          hospitalId: normalizedHospitalId || 'temp-hospital',
           name: operation.name,
           description: operation.description || '',
-          scheduledAt: new Date(operation.scheduledAt),
+          scheduledAt: new Date(operation.scheduledAt || scheduledAt),
           notes: operation.notes || null
         }))
       })
@@ -116,14 +162,65 @@ export async function POST(request: NextRequest) {
           visitId: visit.id,
           patientId,
           doctorId: doctorId || 'temp-doctor',
-          hospitalId: hospitalId || 'temp-hospital',
+          hospitalId: normalizedHospitalId || 'temp-hospital',
           name: medication.name,
           dosage: medication.dosage || '',
           instructions: medication.instructions || '',
-          startDate: new Date(medication.startDate),
+          startDate: new Date(medication.startDate || scheduledAt),
           endDate: medication.endDate ? new Date(medication.endDate) : null
         }))
       })
+    }
+
+    // Create treatment courses if provided
+    if (status === 'COMPLETED' && treatmentCourses && treatmentCourses.length > 0) {
+      console.log('💊 Creating treatment courses:', treatmentCourses.length)
+      
+      for (const course of treatmentCourses) {
+        const treatmentCourse = await prisma.treatmentCourse.create({
+          data: {
+            patientId,
+            doctorId: doctorId || 'temp-doctor',
+            hospitalId: normalizedHospitalId || 'temp-hospital',
+            hospitalTreatmentId: course.hospitalTreatmentId,
+            courseName: course.courseName,
+            description: course.description || '',
+            totalQuantity: course.totalQuantity || 0,
+            reservedQuantity: course.reservedQuantity || 0,
+            deliveredQuantity: course.deliveredQuantity || 0,
+            remainingQuantity: course.remainingQuantity || 0,
+            availableInStock: course.availableInStock || 0,
+            startDate: new Date(course.startDate || new Date()),
+            endDate: course.endDate ? new Date(course.endDate) : null,
+            status: course.status || 'CREATED',
+            isReserved: course.isReserved || false,
+            isDelivered: course.isDelivered || false,
+            instructions: course.instructions || '',
+            notes: course.notes || ''
+          }
+        })
+
+        // Create doses if provided
+        if (course.doses && course.doses.length > 0) {
+          await prisma.treatmentDose.createMany({
+            data: course.doses.map((dose: any, index: number) => ({
+              courseId: treatmentCourse.id,
+              doseNumber: dose.doseNumber || (index + 1),
+              scheduledDate: new Date(dose.scheduledDate || dose.scheduledAt || new Date()),
+              scheduledTime: dose.scheduledTime || '',
+              quantity: dose.quantity || 0,
+              status: dose.status || 'SCHEDULED',
+              takenAt: dose.takenAt || null,
+              takenDate: dose.takenDate ? new Date(dose.takenDate) : null,
+              isTaken: dose.isTaken || false,
+              isOnTime: dose.isOnTime || false,
+              notes: dose.notes || '',
+              sideEffects: dose.sideEffects || '',
+              takenBy: dose.takenBy || null
+            }))
+          })
+        }
+      }
     }
 
     // Fetch the complete visit with relations
@@ -200,6 +297,8 @@ export async function PUT(request: NextRequest) {
       cityId,
       status = 'DRAFT',
       tests = [],
+      diseases = [],
+      treatmentCourses = [],
       treatments = [],
       operations = [],
       medications = [],
@@ -241,6 +340,7 @@ export async function PUT(request: NextRequest) {
       await prisma.treatment.deleteMany({ where: { patientId } })
       await prisma.operation.deleteMany({ where: { patientId } })
       await prisma.medication.deleteMany({ where: { patientId } })
+      await prisma.treatmentCourse.deleteMany({ where: { patientId } })
 
       // Add new related data
       if (tests && tests.length > 0) {
@@ -299,6 +399,57 @@ export async function PUT(request: NextRequest) {
             endDate: medication.endDate ? new Date(medication.endDate) : null
           }))
         })
+      }
+
+      // Create treatment courses if provided
+      if (treatmentCourses && treatmentCourses.length > 0) {
+        console.log('💊 Creating treatment courses:', treatmentCourses.length)
+        
+        for (const course of treatmentCourses) {
+          const treatmentCourse = await prisma.treatmentCourse.create({
+            data: {
+              patientId,
+              doctorId: doctorId || 'temp-doctor',
+              hospitalId: hospitalId || 'temp-hospital',
+              hospitalTreatmentId: course.hospitalTreatmentId,
+              courseName: course.courseName,
+              description: course.description || '',
+              totalQuantity: course.totalQuantity || 0,
+              reservedQuantity: course.reservedQuantity || 0,
+              deliveredQuantity: course.deliveredQuantity || 0,
+              remainingQuantity: course.remainingQuantity || 0,
+              availableInStock: course.availableInStock || 0,
+              startDate: new Date(course.startDate || new Date()),
+              endDate: course.endDate ? new Date(course.endDate) : null,
+              status: course.status || 'CREATED',
+              isReserved: course.isReserved || false,
+              isDelivered: course.isDelivered || false,
+              instructions: course.instructions || '',
+              notes: course.notes || ''
+            }
+          })
+
+          // Create doses if provided
+          if (course.doses && course.doses.length > 0) {
+            await prisma.treatmentDose.createMany({
+              data: course.doses.map((dose: any, index: number) => ({
+                courseId: treatmentCourse.id,
+                doseNumber: dose.doseNumber || (index + 1),
+                scheduledDate: new Date(dose.scheduledAt || new Date()),
+                scheduledTime: dose.scheduledTime || '',
+                quantity: dose.quantity || 0,
+                status: dose.status || 'SCHEDULED',
+                takenAt: dose.takenAt || null,
+                takenDate: dose.takenDate ? new Date(dose.takenDate) : null,
+                isTaken: dose.isTaken || false,
+                isOnTime: dose.isOnTime || false,
+                notes: dose.notes || '',
+                sideEffects: dose.sideEffects || '',
+                takenBy: dose.takenBy || null
+              }))
+            })
+          }
+        }
       }
     }
 

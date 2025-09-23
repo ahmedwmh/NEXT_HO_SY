@@ -17,6 +17,8 @@ export async function PUT(
         category: data.category,
         duration: data.duration,
         cost: data.cost,
+        quantity: data.quantity,
+        expiredate: data.expiredate ? new Date(data.expiredate) : null,
         isActive: data.isActive
       },
       include: {

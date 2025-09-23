@@ -42,7 +42,7 @@ interface VisitData {
   cityId: string
   tests: TestData[]
   diseases: DiseaseData[]
-  treatments: TreatmentData[]
+  treatmentCourses: TreatmentCourseData[]
   operations: OperationData[]
   medications: MedicationData[]
 }
@@ -64,12 +64,47 @@ interface DiseaseData {
   status: string
 }
 
-interface TreatmentData {
+interface TreatmentCourseData {
   id?: string
-  name: string
+  courseName: string
   description: string
-  scheduledAt: string
-  notes?: string
+  hospitalTreatmentId: string
+  // إدارة المخزون والكميات
+  totalQuantity: number          // الكمية الإجمالية المطلوبة
+  reservedQuantity: number       // الكمية المحجوزة للمريض
+  deliveredQuantity: number      // الكمية المسلمة للمريض
+  remainingQuantity: number      // الكمية المتبقية
+  availableInStock: number       // الكمية المتاحة في المخزون
+  // التواريخ
+  startDate: string             // تاريخ بداية الكورس
+  endDate?: string              // تاريخ نهاية الكورس
+  // الحالة والمتابعة
+  status: string                // حالة الكورس (تم إنشاؤه، محجوز، مسلم، جاري، مكتمل، ملغي)
+  isReserved: boolean           // هل تم حجز الدواء؟
+  isDelivered: boolean          // هل تم تسليم الدواء؟
+  // التفاصيل الإضافية
+  instructions?: string         // تعليمات خاصة
+  notes?: string               // ملاحظات
+  // الجرعات
+  doses: TreatmentDoseData[]
+}
+
+interface TreatmentDoseData {
+  id?: string
+  doseNumber: number
+  // جدولة الجرعة
+  scheduledDate: string         // تاريخ الجرعة المحدد
+  scheduledTime: string         // وقت الجرعة المحدد
+  quantity: number             // كمية الجرعة
+  // تتبع الالتزام
+  status: string               // حالة الجرعة (مجدول، تم أخذه، فات الموعد، تم تخطيه)
+  takenAt?: string             // وقت أخذ الجرعة الفعلي
+  takenDate?: string           // تاريخ أخذ الجرعة الفعلي
+  isTaken: boolean             // هل تم أخذ الجرعة؟
+  isOnTime: boolean            // هل تم أخذها في الموعد؟
+  // التفاصيل الإضافية
+  notes?: string               // ملاحظات خاصة بالجرعة
+  sideEffects?: string         // آثار جانبية (إن وجدت)
 }
 
 interface OperationData {
@@ -101,6 +136,11 @@ export default function ComprehensiveVisitSystem({
   const [isLoading, setIsLoading] = useState(false)
   const [savedSteps, setSavedSteps] = useState<Set<number>>(new Set())
   const [isAddingItem, setIsAddingItem] = useState(false)
+  
+  // Treatment course management
+  const [availableTreatments, setAvailableTreatments] = useState<any[]>([])
+  const [loadingTreatments, setLoadingTreatments] = useState(false)
+  const [treatmentAlerts, setTreatmentAlerts] = useState<{[key: string]: string}>({})
   const [visitData, setVisitData] = useState<VisitData>({
     scheduledAt: '',
     symptoms: '',
@@ -111,10 +151,117 @@ export default function ComprehensiveVisitSystem({
     cityId: '',
     tests: [],
     diseases: [],
-    treatments: [],
+    treatmentCourses: [],
     operations: [],
     medications: []
   })
+
+  // Auto-fill patient data function
+  const [isApplyingPatientData, setIsApplyingPatientData] = useState(false)
+
+  const applyPatientData = async () => {
+    if (!patientData) return
+    if (isApplyingPatientData) return
+    setIsApplyingPatientData(true)
+    try {
+    console.log('🔄 Applying patient data:', patientData)
+    
+    // Find the first available doctor for the hospital
+    let selectedDoctorId = ''
+    if (patientData.hospitalId && doctors) {
+      const hospitalDoctors = doctors.filter((doctor: any) => doctor.hospitalId === patientData.hospitalId)
+      if (hospitalDoctors.length > 0) {
+        selectedDoctorId = hospitalDoctors[0].id
+        console.log('👨‍⚕️ Auto-selected doctor:', hospitalDoctors[0].firstName, hospitalDoctors[0].lastName)
+      }
+    }
+    
+    setVisitData(prev => ({
+      ...prev,
+      cityId: patientData.hospital?.city?.id || '',
+      hospitalId: patientData.hospitalId || '',
+      doctorId: selectedDoctorId,
+      scheduledAt: new Date().toISOString().slice(0, 16) // Current date/time
+    }))
+
+    // Mark step 1 as saved since we have basic info
+    setSavedSteps(prev => new Set(Array.from(prev).concat([1])))
+    
+    // If patient has selected tests, add them to the visit
+    if (patientData.tests && patientData.tests.length > 0) {
+      const patientTests = patientData.tests.map((test: any) => ({
+        name: test.name,
+        description: test.description || '',
+        status: 'SCHEDULED'
+      }))
+      
+      setVisitData(prev => ({
+        ...prev,
+        tests: patientTests
+      }))
+      
+      // Mark step 2 as saved if we have tests
+      setSavedSteps(prev => new Set(Array.from(prev).concat([2])))
+      
+      console.log('✅ Patient selected tests applied:', patientTests.length)
+    }
+    
+    console.log('✅ Patient data applied successfully')
+    } finally {
+      setIsApplyingPatientData(false)
+    }
+  }
+
+  // Fetch available treatments from hospital
+  const fetchAvailableTreatments = async (hospitalId: string) => {
+    if (!hospitalId) return
+    
+    setLoadingTreatments(true)
+    try {
+      const response = await fetch(`/api/hospital-treatments?hospitalId=${hospitalId}`)
+      const result = await response.json()
+      
+      if (result.success) {
+        setAvailableTreatments(result.data || [])
+        console.log('💊 Available treatments loaded:', result.data?.length || 0)
+      } else {
+        console.error('❌ Failed to load treatments:', result.error)
+        setAvailableTreatments([])
+      }
+    } catch (error) {
+      console.error('❌ Error fetching treatments:', error)
+      setAvailableTreatments([])
+    } finally {
+      setLoadingTreatments(false)
+    }
+  }
+
+  // Check treatment availability and generate alerts
+  const checkTreatmentAvailability = (treatmentId: string, requestedQuantity: number) => {
+    const treatment = hospitalTreatments?.find((t: any) => t.id === treatmentId)
+    if (!treatment) return 'العلاج غير متوفر'
+    
+    const availableQuantity = (treatment.quantity || 0) - (treatment.reservedQuantity || 0)
+    
+    if (availableQuantity < requestedQuantity) {
+      return `الكمية المتاحة: ${availableQuantity}، المطلوبة: ${requestedQuantity}`
+    }
+    
+    // Check expiry date
+    if (treatment.expiredate) {
+      const expiryDate = new Date(treatment.expiredate)
+      const now = new Date()
+      const daysUntilExpiry = Math.ceil((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+      
+      if (daysUntilExpiry < 0) {
+        return 'العلاج منتهي الصلاحية'
+      } else if (daysUntilExpiry < 30) {
+        return `صلاحية العلاج تنتهي خلال ${daysUntilExpiry} يوم`
+      }
+    }
+    
+    return null
+  }
 
   const queryClient = useQueryClient()
 
@@ -130,6 +277,47 @@ export default function ComprehensiveVisitSystem({
     enabled: !!visitId
   })
 
+  // Fetch treatment courses for the visit
+  const { data: treatmentCourses, isLoading: isLoadingTreatmentCourses } = useQuery({
+    queryKey: ['treatment-courses', existingVisit?.patientId, existingVisit?.doctorId, existingVisit?.hospitalId],
+    queryFn: async () => {
+      if (!existingVisit?.patientId || !existingVisit?.doctorId || !existingVisit?.hospitalId) return []
+      const response = await fetch(`/api/treatment-courses?patientId=${existingVisit.patientId}&doctorId=${existingVisit.doctorId}&hospitalId=${existingVisit.hospitalId}`)
+      const result = await response.json()
+      return result.success ? result.data : []
+    },
+    enabled: !!existingVisit?.patientId && !!existingVisit?.doctorId && !!existingVisit?.hospitalId
+  })
+
+  // Fetch diseases for the visit
+  const { data: diseases, isLoading: isLoadingVisitDiseases } = useQuery({
+    queryKey: ['diseases', existingVisit?.patientId, existingVisit?.scheduledAt],
+    queryFn: async () => {
+      if (!existingVisit?.patientId || !existingVisit?.scheduledAt) return []
+      
+      // Calculate date range around the visit (24 hours before and after)
+      const visitDate = new Date(existingVisit.scheduledAt)
+      const startDate = new Date(visitDate.getTime() - 24 * 60 * 60 * 1000)
+      const endDate = new Date(visitDate.getTime() + 24 * 60 * 60 * 1000)
+      
+      const response = await fetch(`/api/diseases?patientId=${existingVisit.patientId}&startDate=${startDate.toISOString()}&endDate=${endDate.toISOString()}`)
+      const result = await response.json()
+      return result.success ? result.data : []
+    },
+    enabled: !!existingVisit?.patientId && !!existingVisit?.scheduledAt
+  })
+
+  // Fetch patient data for auto-fill
+  const { data: patientData, isLoading: isLoadingPatient } = useQuery({
+    queryKey: ['patient', patientId],
+    queryFn: async () => {
+      const response = await fetch(`/api/patients/${patientId}`)
+      const result = await response.json()
+      return result.success ? result.data : null
+    },
+    enabled: !!patientId && isOpen
+  })
+
   // Load existing visit data
   useEffect(() => {
     if (existingVisit) {
@@ -141,7 +329,9 @@ export default function ComprehensiveVisitSystem({
       console.log('🧪 Tests Count:', existingVisit.tests?.length || 0)
       console.log('🧪 Tests Data:', existingVisit.tests)
       console.log('🦠 Diseases Count:', existingVisit.diseases?.length || 0)
-      console.log('💊 Treatments Count:', existingVisit.treatments?.length || 0)
+      console.log('🦠 Diseases Data:', existingVisit.diseases)
+      console.log('💊 Treatment Courses Count:', existingVisit.treatmentCourses?.length || 0)
+      console.log('💊 Treatment Courses Data:', existingVisit.treatmentCourses)
       console.log('🏥 Operations Count:', existingVisit.operations?.length || 0)
       console.log('💉 Medications Count:', existingVisit.medications?.length || 0)
       
@@ -205,12 +395,41 @@ export default function ComprehensiveVisitSystem({
                notes: test.notes || '',
                images: test.images || []
              })) || [],
-             diseases: existingVisit.diseases?.map((disease: any) => ({
+             diseases: (existingVisit.diseases || diseases || [])?.map((disease: any) => ({
+               id: disease.id,
                name: disease.name,
                description: disease.description || '',
                diagnosedAt: disease.diagnosedAt ? new Date(disease.diagnosedAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
                severity: disease.severity || '',
                status: disease.status || 'Active'
+             })) || [],
+             treatmentCourses: (existingVisit.treatmentCourses || treatmentCourses || [])?.map((course: any) => ({
+               id: course.id,
+               hospitalTreatmentId: course.hospitalTreatmentId,
+               courseName: course.courseName || '',
+               description: course.description || '',
+               totalQuantity: course.totalQuantity || 0,
+               deliveredQuantity: course.deliveredQuantity || 0,
+               remainingQuantity: course.remainingQuantity || 0,
+               reservedQuantity: course.reservedQuantity || 0,
+               isReserved: course.isReserved || false,
+               isDelivered: course.isDelivered || false,
+               status: course.status || 'PENDING',
+               availableInStock: course.availableInStock || 0,
+               doses: course.doses?.map((dose: any) => ({
+                 id: dose.id,
+                 doseNumber: dose.doseNumber || 1,
+                 quantity: dose.quantity || 0,
+                 scheduledAt: dose.scheduledDate ? new Date(dose.scheduledDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+                 scheduledTime: dose.scheduledTime || '',
+                 takenAt: dose.takenAt || '',
+                 takenDate: dose.takenDate || '',
+                 status: dose.status || 'PENDING',
+                 isTaken: dose.isTaken || false,
+                 isOnTime: dose.isOnTime || false,
+                 notes: dose.notes || '',
+                 sideEffects: dose.sideEffects || ''
+               })) || []
              })) || [],
              treatments: existingVisit.treatments?.map((treatment: any) => ({
                name: treatment.name,
@@ -268,12 +487,12 @@ export default function ComprehensiveVisitSystem({
         }
       }
       
-      // Step 4: Treatments - only if there are actual treatments with data
-      if (formattedVisitData.treatments && formattedVisitData.treatments.length > 0) {
-        const hasValidTreatments = formattedVisitData.treatments.some((treatment: any) => 
-          treatment.name && treatment.name.trim() !== ''
+      // Step 4: Treatment Courses - only if there are actual treatment courses with data
+      if (formattedVisitData.treatmentCourses && formattedVisitData.treatmentCourses.length > 0) {
+        const hasValidTreatmentCourses = formattedVisitData.treatmentCourses.some((course: any) => 
+          course.courseName && course.courseName.trim() !== ''
         )
-        if (hasValidTreatments) {
+        if (hasValidTreatmentCourses) {
           loadedSavedSteps.add(4)
         }
       }
@@ -299,11 +518,22 @@ export default function ComprehensiveVisitSystem({
            console.log('🧪 Tests details:', JSON.stringify(formattedVisitData.tests, null, 2))
            console.log('🦠 Diseases loaded:', formattedVisitData.diseases.length, 'items')
            console.log('🦠 Diseases details:', JSON.stringify(formattedVisitData.diseases, null, 2))
-           console.log('💊 Treatments loaded:', formattedVisitData.treatments.length, 'items')
+           console.log('💊 Treatment Courses loaded:', formattedVisitData.treatmentCourses?.length || 0, 'items')
+           console.log('💊 Treatment Courses details:', JSON.stringify(formattedVisitData.treatmentCourses, null, 2))
            console.log('🏥 Operations loaded:', formattedVisitData.operations.length, 'items')
            console.log('💉 Medications loaded:', formattedVisitData.medications.length, 'items')
+           
+           // Show success toast
+           toast.success('تم تحميل بيانات الزيارة بنجاح')
     }
   }, [existingVisit])
+
+  // Fetch treatments when hospital changes
+  useEffect(() => {
+    if (visitData.hospitalId) {
+      fetchAvailableTreatments(visitData.hospitalId)
+    }
+  }, [visitData.hospitalId])
 
   // Fetch data for dropdowns
   const { data: cities, isLoading: isLoadingCities } = useQuery({
@@ -405,7 +635,7 @@ export default function ComprehensiveVisitSystem({
   console.log('🦠 Debug - filteredDiseases count:', filteredDiseases.length)
   console.log('🦠 Debug - filteredDiseases sample:', filteredDiseases.slice(0, 3))
 
-  const { data: availableTreatments, isLoading: isLoadingTreatments } = useQuery({
+  const { data: hospitalTreatments, isLoading: isLoadingTreatments } = useQuery({
     queryKey: ['hospital-treatments'],
     queryFn: async () => {
       console.log('💊 ===== FETCHING AVAILABLE TREATMENTS =====')
@@ -418,18 +648,18 @@ export default function ComprehensiveVisitSystem({
       
       const result = await response.json()
       const allTreatments = result.data || []
-      console.log('💊 All treatments count:', allTreatments.length)
+      console.log('💊 All hospital treatments count:', allTreatments.length)
       
       return allTreatments
     }
   })
 
-  // Filter treatments by selected hospital
-  const filteredTreatments = availableTreatments?.filter((treatment: any) => 
+  // Filter treatment courses by selected hospital
+  const filteredTreatments = hospitalTreatments?.filter((treatment: any) => 
     !visitData.hospitalId || treatment.hospitalId === visitData.hospitalId
   ) || []
   
-  console.log('💊 Debug - availableTreatments count:', availableTreatments?.length || 0)
+  console.log('💊 Debug - hospitalTreatments count:', hospitalTreatments?.length || 0)
   console.log('💊 Debug - filteredTreatments count:', filteredTreatments.length)
   console.log('💊 Debug - filteredTreatments sample:', filteredTreatments.slice(0, 3))
 
@@ -518,7 +748,7 @@ export default function ComprehensiveVisitSystem({
       console.log('🧪 Tests Count:', visitData.tests.length)
       console.log('🧪 Tests Data:', JSON.stringify(visitData.tests, null, 2))
       console.log('🦠 Diseases Count:', visitData.diseases.length)
-      console.log('💊 Treatments Count:', visitData.treatments.length)
+      console.log('💊 Treatment Courses Count:', visitData.treatmentCourses?.length || 0)
       console.log('🏥 Operations Count:', visitData.operations.length)
       console.log('💉 Medications Count:', visitData.medications.length)
       console.log('📝 Full visit data:', JSON.stringify(visitData, null, 2))
@@ -540,7 +770,7 @@ export default function ComprehensiveVisitSystem({
               status: 'COMPLETED',
               tests: visitData.tests,
               diseases: visitData.diseases,
-              treatments: visitData.treatments,
+              treatmentCourses: visitData.treatmentCourses,
               operations: visitData.operations,
               medications: visitData.medications
             } : {
@@ -558,7 +788,7 @@ export default function ComprehensiveVisitSystem({
               status: 'DRAFT',
               tests: visitData.tests,
               diseases: visitData.diseases,
-              treatments: visitData.treatments,
+              treatmentCourses: visitData.treatmentCourses,
               operations: visitData.operations,
               medications: visitData.medications
             }
@@ -642,6 +872,21 @@ export default function ComprehensiveVisitSystem({
   })
 
   const handleSave = (isComplete: boolean = false) => {
+    // Basic validation
+    if (!visitData.scheduledAt || visitData.scheduledAt === '') {
+      toast.error('يرجى تحديد تاريخ ووقت الزيارة')
+      return
+    }
+    if (isComplete) {
+      if (!visitData.hospitalId) {
+        toast.error('يرجى اختيار المستشفى')
+        return
+      }
+      if (!visitData.doctorId) {
+        toast.error('يرجى اختيار الطبيب')
+        return
+      }
+    }
     // Check if current step is already saved
     if (savedSteps.has(currentStep)) {
       toast.error('⚠️ هذه الخطوة محفوظة مسبقاً!', {
@@ -694,7 +939,7 @@ export default function ComprehensiveVisitSystem({
     console.log('📊 Current tests:', JSON.stringify(visitData.tests, null, 2))
     
     // Check if test already exists to prevent duplicates
-    const testExists = visitData.tests.some(test => test.name === testName)
+    const testExists = visitData.tests.some((test: any) => test.name === testName)
     if (testExists) {
       console.log('⚠️ Test already exists, skipping addition')
       return
@@ -810,52 +1055,191 @@ export default function ComprehensiveVisitSystem({
     setVisitData({ ...visitData, diseases: newDiseases })
   }
 
-  // Treatment management
-  const addTreatment = (treatmentName?: string, treatmentDescription?: string) => {
-    console.log('💊 ===== ADDING TREATMENT =====')
+  // Treatment Course management
+  const addTreatmentCourse = (treatmentId?: string, treatmentName?: string) => {
+    console.log('💊 ===== ADDING TREATMENT COURSE =====')
+    console.log('📝 Treatment ID:', treatmentId)
     console.log('📝 Treatment name:', treatmentName)
-    console.log('📄 Treatment description:', treatmentDescription)
-    console.log('📊 Current treatments count:', visitData.treatments.length)
+    console.log('📊 Current treatment courses count:', visitData.treatmentCourses.length)
     
-    // Check if treatment already exists to prevent duplicates
-    const treatmentExists = visitData.treatments.some(treatment => treatment.name === treatmentName)
-    if (treatmentExists) {
-      console.log('⚠️ Treatment already exists, skipping addition')
+    // Check if treatment course already exists to prevent duplicates
+    const courseExists = visitData.treatmentCourses.some(course => course.hospitalTreatmentId === treatmentId)
+    if (courseExists) {
+      console.log('⚠️ Treatment course already exists, skipping addition')
       return
     }
     
-    const newTreatment = {
-      name: treatmentName || '',
-      description: treatmentDescription || '',
-      scheduledAt: new Date().toISOString().split('T')[0],
+    const treatment = hospitalTreatments?.find((t: any) => t.id === treatmentId)
+    const availableInStock = treatment ? (treatment.quantity || 0) - (treatment.reservedQuantity || 0) : 0
+    
+    const newTreatmentCourse: TreatmentCourseData = {
+      courseName: treatmentName || '',
+      description: '',
+      hospitalTreatmentId: treatmentId || '',
+      // إدارة المخزون والكميات
+      totalQuantity: 1,
+      reservedQuantity: 0,
+      deliveredQuantity: 0,
+      remainingQuantity: 1,
+      availableInStock: availableInStock,
+      // التواريخ
+      startDate: new Date().toISOString().split('T')[0],
+      endDate: '',
+      // الحالة والمتابعة
+      status: 'CREATED',
+      isReserved: false,
+      isDelivered: false,
+      // التفاصيل الإضافية
+      instructions: '',
       notes: '',
-      hospitalId: visitData.hospitalId
+      // الجرعات
+      doses: []
     }
     
-    console.log('🆕 New treatment to add:', JSON.stringify(newTreatment, null, 2))
+    console.log('🆕 New treatment course to add:', JSON.stringify(newTreatmentCourse, null, 2))
     
-    const updatedTreatments = [...visitData.treatments, newTreatment]
+    const updatedTreatmentCourses = [...visitData.treatmentCourses, newTreatmentCourse]
     
-    console.log('📊 Updated treatments array:', JSON.stringify(updatedTreatments, null, 2))
+    console.log('📊 Updated treatment courses array:', JSON.stringify(updatedTreatmentCourses, null, 2))
     
     setVisitData({
       ...visitData,
-      treatments: updatedTreatments
+      treatmentCourses: updatedTreatmentCourses
     })
     
-    console.log('✅ Treatment added successfully!')
-    console.log('📊 New treatments count:', updatedTreatments.length)
+    console.log('✅ Treatment course added successfully!')
+    console.log('📊 New treatment courses count:', updatedTreatmentCourses.length)
   }
 
-  const updateTreatment = (index: number, field: keyof TreatmentData, value: string) => {
-    const newTreatments = [...visitData.treatments]
-    newTreatments[index] = { ...newTreatments[index], [field]: value }
-    setVisitData({ ...visitData, treatments: newTreatments })
+  const updateTreatmentCourse = (index: number, field: keyof TreatmentCourseData, value: string | number) => {
+    const newTreatmentCourses = [...visitData.treatmentCourses]
+    newTreatmentCourses[index] = { ...newTreatmentCourses[index], [field]: value }
+    
+    // Recalculate remaining quantity when total quantity changes
+    if (field === 'totalQuantity') {
+      const totalQty = typeof value === 'number' ? value : parseInt(value.toString()) || 0
+      const deliveredQty = newTreatmentCourses[index].deliveredQuantity || 0
+      newTreatmentCourses[index].remainingQuantity = totalQty - deliveredQty
+    }
+    
+    setVisitData({ ...visitData, treatmentCourses: newTreatmentCourses })
   }
 
-  const removeTreatment = (index: number) => {
-    const newTreatments = visitData.treatments.filter((_, i) => i !== index)
-    setVisitData({ ...visitData, treatments: newTreatments })
+  const removeTreatmentCourse = (index: number) => {
+    const newTreatmentCourses = visitData.treatmentCourses.filter((_, i) => i !== index)
+    setVisitData({ ...visitData, treatmentCourses: newTreatmentCourses })
+  }
+
+  const addDoseToCourse = (courseIndex: number) => {
+    const newTreatmentCourses = [...visitData.treatmentCourses]
+    const course = newTreatmentCourses[courseIndex]
+    
+    const newDose: TreatmentDoseData = {
+      doseNumber: course.doses.length + 1,
+      // جدولة الجرعة
+      scheduledDate: new Date().toISOString().split('T')[0],
+      scheduledTime: '08:00',
+      quantity: 1,
+      // تتبع الالتزام
+      status: 'SCHEDULED',
+      takenAt: '',
+      takenDate: '',
+      isTaken: false,
+      isOnTime: false,
+      // التفاصيل الإضافية
+      notes: '',
+      sideEffects: ''
+    }
+    
+    course.doses = [...course.doses, newDose]
+    setVisitData({ ...visitData, treatmentCourses: newTreatmentCourses })
+  }
+
+  const updateDose = (courseIndex: number, doseIndex: number, field: keyof TreatmentDoseData, value: string | number) => {
+    const newTreatmentCourses = [...visitData.treatmentCourses]
+    newTreatmentCourses[courseIndex].doses[doseIndex] = {
+      ...newTreatmentCourses[courseIndex].doses[doseIndex],
+      [field]: value
+    }
+    setVisitData({ ...visitData, treatmentCourses: newTreatmentCourses })
+  }
+
+  const removeDose = (courseIndex: number, doseIndex: number) => {
+    const newTreatmentCourses = [...visitData.treatmentCourses]
+    newTreatmentCourses[courseIndex].doses = newTreatmentCourses[courseIndex].doses.filter((_, i) => i !== doseIndex)
+    
+    // Renumber doses
+    newTreatmentCourses[courseIndex].doses.forEach((dose, index) => {
+      dose.doseNumber = index + 1
+    })
+    
+    setVisitData({ ...visitData, treatmentCourses: newTreatmentCourses })
+  }
+
+  // دوال إدارة الحجز والتسليم
+  const reserveTreatment = (courseIndex: number) => {
+    const newTreatmentCourses = [...visitData.treatmentCourses]
+    const course = newTreatmentCourses[courseIndex]
+    
+    if (course.availableInStock >= course.totalQuantity) {
+      course.isReserved = true
+      course.reservedQuantity = course.totalQuantity
+      course.status = 'RESERVED'
+      course.availableInStock -= course.totalQuantity
+      
+      setVisitData({ ...visitData, treatmentCourses: newTreatmentCourses })
+      console.log('✅ Treatment reserved successfully')
+    } else {
+      console.error('❌ Not enough stock available')
+    }
+  }
+
+  const deliverTreatment = (courseIndex: number) => {
+    const newTreatmentCourses = [...visitData.treatmentCourses]
+    const course = newTreatmentCourses[courseIndex]
+    
+    if (course.isReserved && course.reservedQuantity > 0) {
+      course.isDelivered = true
+      course.deliveredQuantity = course.reservedQuantity
+      course.remainingQuantity = course.totalQuantity - course.deliveredQuantity
+      course.status = 'DELIVERED'
+      
+      setVisitData({ ...visitData, treatmentCourses: newTreatmentCourses })
+      console.log('✅ Treatment delivered successfully')
+    } else {
+      console.error('❌ Treatment must be reserved first')
+    }
+  }
+
+  const markDoseAsTaken = (courseIndex: number, doseIndex: number) => {
+    const newTreatmentCourses = [...visitData.treatmentCourses]
+    const dose = newTreatmentCourses[courseIndex].doses[doseIndex]
+    
+    const now = new Date()
+    const scheduledDateTime = new Date(`${dose.scheduledDate}T${dose.scheduledTime}`)
+    const timeDiff = now.getTime() - scheduledDateTime.getTime()
+    const isOnTime = Math.abs(timeDiff) <= 30 * 60 * 1000 // 30 minutes tolerance
+    
+    dose.isTaken = true
+    dose.status = 'TAKEN'
+    dose.takenAt = now.toTimeString().slice(0, 5)
+    dose.takenDate = now.toISOString().split('T')[0]
+    dose.isOnTime = isOnTime
+    
+    setVisitData({ ...visitData, treatmentCourses: newTreatmentCourses })
+    console.log('✅ Dose marked as taken')
+  }
+
+  const markDoseAsMissed = (courseIndex: number, doseIndex: number) => {
+    const newTreatmentCourses = [...visitData.treatmentCourses]
+    const dose = newTreatmentCourses[courseIndex].doses[doseIndex]
+    
+    dose.status = 'MISSED'
+    dose.isTaken = false
+    dose.isOnTime = false
+    
+    setVisitData({ ...visitData, treatmentCourses: newTreatmentCourses })
+    console.log('⚠️ Dose marked as missed')
   }
 
   // Operation management
@@ -963,13 +1347,14 @@ export default function ComprehensiveVisitSystem({
   if (!isOpen) return null
 
   // Show loading state while fetching existing visit data
-  if (visitId && isLoadingVisit) {
+  if (visitId && (isLoadingVisit || isLoadingTreatmentCourses || isLoadingVisitDiseases)) {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
         <div className="bg-white rounded-lg p-6 w-full max-w-6xl max-h-[90vh] overflow-y-auto">
           <div className="flex flex-col items-center justify-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
             <p className="text-lg text-gray-600">جاري تحميل بيانات الزيارة...</p>
+            <p className="text-sm text-gray-500 mt-2">يرجى الانتظار بينما نقوم بجلب جميع البيانات المحفوظة</p>
           </div>
         </div>
       </div>
@@ -1038,9 +1423,39 @@ export default function ComprehensiveVisitSystem({
         {currentStep === 1 && (
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center">
-                <Calendar className="w-5 h-5 mr-2" />
-                معلومات الزيارة الأساسية
+              <CardTitle className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <Calendar className="w-5 h-5 mr-2" />
+                  معلومات الزيارة الأساسية
+                </div>
+                {patientData && !visitId && (
+                  <div className="flex flex-col items-end space-y-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={applyPatientData}
+                      className="bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200"
+                    >
+                      {isApplyingPatientData ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+                          جاري التطبيق...
+                        </>
+                      ) : (
+                        <>
+                          <User className="w-4 h-4 mr-2" />
+                          تطبيق بيانات المريض
+                        </>
+                      )}
+                    </Button>
+                    {patientData.tests && patientData.tests.length > 0 && (
+                      <p className="text-xs text-gray-500 text-right">
+                        سيتم تطبيق {patientData.tests.length} فحص مختار للمريض
+                      </p>
+                    )}
+                  </div>
+                )}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -1206,9 +1621,9 @@ export default function ComprehensiveVisitSystem({
                       </div>
                     ) : (
                       filteredTests?.map((test: any) => {
-                    const isSelected = visitData.tests.some(selectedTest => selectedTest.name === test.name)
+                    const isSelected = visitData.tests.some((selectedTest: any) => selectedTest.name === test.name)
                     console.log('🧪 Checking test:', test.name, 'isSelected:', isSelected)
-                    console.log('🧪 Current visitData.tests:', visitData.tests.map(t => t.name))
+                    console.log('🧪 Current visitData.tests:', visitData.tests.map((t: any) => t.name))
                     return (
                       <button
                         key={test.id}
@@ -1350,6 +1765,7 @@ export default function ComprehensiveVisitSystem({
                     console.log('🦠 Current visitData.diseases:', visitData.diseases.map(d => d.name))
                     return (
                       <button
+                        type="button"
                         key={disease.id}
                         onClick={() => addDisease(disease.name, disease.description)}
                         disabled={isSelected}
@@ -1383,6 +1799,7 @@ export default function ComprehensiveVisitSystem({
                   console.log('🦠 ===== RENDERING SELECTED DISEASES =====')
                   console.log('🦠 Visit data diseases:', JSON.stringify(visitData.diseases, null, 2))
                   console.log('🦠 Diseases count:', visitData.diseases.length)
+                  console.log('🦠 Diseases from existingVisit:', existingVisit?.diseases)
                   return null
                 })()}
               </div>
@@ -1453,27 +1870,27 @@ export default function ComprehensiveVisitSystem({
           </Card>
         )}
 
-        {/* Step 4: Treatments */}
+        {/* Step 4: Treatment Courses */}
         {currentStep === 4 && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
                 <div className="flex items-center">
                   <Stethoscope className="w-5 h-5 mr-2" />
-                  العلاجات الموصوفة
+                  الكورس العلاجي
                 </div>
                 <Button 
-                  onClick={() => addTreatment()} 
+                  onClick={() => addTreatmentCourse()} 
                   size="sm"
-                  disabled={isLoadingTreatments}
+                  disabled={loadingTreatments}
                   className="bg-green-600 hover:bg-green-700"
                 >
-                  {isLoadingTreatments ? (
+                  {loadingTreatments ? (
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-1"></div>
                   ) : (
                     <Plus className="w-4 h-4 mr-1" />
                   )}
-                  {isLoadingTreatments ? 'جاري التحميل...' : 'إضافة علاج'}
+                  {loadingTreatments ? 'جاري التحميل...' : 'إضافة كورس علاجي'}
                 </Button>
               </CardTitle>
             </CardHeader>
@@ -1487,102 +1904,430 @@ export default function ComprehensiveVisitSystem({
                   <div className="text-center py-8 text-gray-500 border rounded-lg bg-gray-50">
                     <p>يرجى اختيار المستشفى أولاً لعرض العلاجات المتاحة</p>
                   </div>
+                ) : loadingTreatments ? (
+                  <div className="text-center py-8 text-gray-500 border rounded-lg bg-gray-50">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-400 mx-auto mb-2"></div>
+                    <p>جاري تحميل العلاجات المتاحة...</p>
+                  </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-32 overflow-y-auto border rounded-lg p-2">
-                    {filteredTreatments?.length === 0 ? (
+                    {hospitalTreatments?.length === 0 ? (
                       <div className="col-span-2 text-center py-4 text-gray-500">
                         {visitData.hospitalId ? 'لا توجد علاجات متاحة في هذا المستشفى' : 'يرجى اختيار المستشفى أولاً'}
                       </div>
                     ) : (
-                      filteredTreatments?.map((treatment: any) => {
-                    const isSelected = visitData.treatments.some(selectedTreatment => selectedTreatment.name === treatment.name)
-                    console.log('💊 Checking treatment:', treatment.name, 'isSelected:', isSelected)
-                    console.log('💊 Current visitData.treatments:', visitData.treatments.map(t => t.name))
-                    return (
-                      <button
-                        key={treatment.id}
-                        onClick={() => addTreatment(treatment.name, treatment.description)}
-                        disabled={isSelected}
-                        className={`text-right p-2 text-sm rounded border transition-colors ${
-                          isSelected 
-                            ? 'bg-green-50 border-green-300 text-green-700 cursor-not-allowed' 
-                            : 'hover:bg-green-50 hover:border-green-300'
-                        }`}
-                      >
-                        <div className="font-medium flex items-center justify-between">
-                          {treatment.name}
-                          {isSelected && <span className="text-green-600">✓</span>}
-                        </div>
-                        {treatment.description && (
-                          <div className="text-xs text-gray-500 mt-1">{treatment.description}</div>
-                        )}
-                      </button>
-                    )
-                  })
+                      hospitalTreatments?.map((treatment: any) => {
+                        const isSelected = visitData.treatmentCourses.some(course => course.hospitalTreatmentId === treatment.id)
+                        const alert = checkTreatmentAvailability(treatment.id, 1)
+                        
+                        return (
+                          <button
+                            key={treatment.id}
+                            onClick={() => addTreatmentCourse(treatment.id, treatment.name)}
+                            disabled={isSelected}
+                            className={`text-right p-3 text-sm rounded border transition-colors ${
+                              isSelected 
+                                ? 'bg-green-50 border-green-300 text-green-700 cursor-not-allowed' 
+                                : 'hover:bg-green-50 hover:border-green-300'
+                            }`}
+                          >
+                            <div className="font-medium flex items-center justify-between">
+                              {treatment.name}
+                              {isSelected && <span className="text-green-600">✓</span>}
+                              {alert !== null && <span className="text-red-600">⚠️</span>}
+                            </div>
+                            {treatment.description && (
+                              <div className="text-xs text-gray-500 mt-1">{treatment.description}</div>
+                            )}
+                            <div className="text-xs mt-1">
+                              <div>الكمية: {treatment.quantity || 0}</div>
+                              <div>المحجوز: {treatment.reservedQuantity || 0}</div>
+                              {treatment.expiredate && (
+                                <div>
+                                  الانتهاء: {new Date(treatment.expiredate).toLocaleDateString('ar-EG-u-ca-gregory', { year: 'numeric', month: 'long', day: 'numeric' })}
+                                </div>
+                              )}
+                            </div>
+                            {alert && (
+                              <div className="text-xs text-red-600 mt-1 font-medium">{alert}</div>
+                            )}
+                          </button>
+                        )
+                      })
                     )}
                   </div>
                 )}
               </div>
 
-              {/* Current Treatments */}
+              {/* Current Treatment Courses */}
               <div className="mb-4">
                 <Label className="text-sm font-medium text-gray-700 mb-2 block">
-                  العلاجات المختارة ({visitData.treatments.length}):
+                  الكورسات العلاجية المختارة ({visitData.treatmentCourses.length}):
                 </Label>
                 {(() => {
-                  console.log('💊 ===== RENDERING SELECTED TREATMENTS =====')
-                  console.log('💊 Visit data treatments:', JSON.stringify(visitData.treatments, null, 2))
-                  console.log('💊 Treatments count:', visitData.treatments.length)
+                  console.log('💊 ===== RENDERING SELECTED TREATMENT COURSES =====')
+                  console.log('💊 Visit data treatment courses:', JSON.stringify(visitData.treatmentCourses, null, 2))
+                  console.log('💊 Treatment courses count:', visitData.treatmentCourses.length)
+                  console.log('💊 Treatment courses from existingVisit:', existingVisit?.treatmentCourses)
                   return null
                 })()}
               </div>
-              {visitData.treatments.length === 0 ? (
+              {visitData.treatmentCourses.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
-                  لا توجد علاجات موصوفة
+                  لا توجد كورسات علاجية موصوفة
                 </div>
               ) : (
-                <div className="space-y-4">
-                  {visitData.treatments.map((treatment, index) => (
-                    <div key={index} className="p-4 border rounded-lg bg-green-50">
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div>
-                          <Label>اسم العلاج</Label>
-                          <Input
-                            value={treatment.name}
-                            onChange={(e) => updateTreatment(index, 'name', e.target.value)}
-                            placeholder="اسم العلاج"
-                          />
-                        </div>
-                        <div>
-                          <Label>تاريخ العلاج</Label>
-                          <Input
-                            type="date"
-                            value={treatment.scheduledAt}
-                            onChange={(e) => updateTreatment(index, 'scheduledAt', e.target.value)}
-                          />
-                        </div>
-                        <div className="flex items-end">
+                <div className="space-y-6">
+                  {visitData.treatmentCourses.map((course, courseIndex) => {
+                    const treatment = hospitalTreatments?.find((t: any) => t.id === course.hospitalTreatmentId)
+                    const alert = treatment ? checkTreatmentAvailability(course.hospitalTreatmentId, course.totalQuantity) : null
+                    
+                    return (
+                      <div key={courseIndex} className="p-6 border rounded-lg bg-gradient-to-r from-green-50 to-blue-50">
+                        {/* Course Header */}
+                        <div className="flex items-center justify-between mb-4">
+                          <h4 className="text-lg font-semibold text-gray-800">
+                            {course.courseName || treatment?.name || 'كورس علاجي جديد'}
+                          </h4>
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => removeTreatment(index)}
+                            onClick={() => removeTreatmentCourse(courseIndex)}
                             className="text-red-600 hover:text-red-700"
                           >
                             <Trash2 className="w-4 h-4" />
                           </Button>
                         </div>
+
+                        {/* Alert */}
+                        {alert && (
+                          <div className="mb-4 p-3 bg-red-100 border border-red-300 rounded-lg">
+                            <div className="flex items-center">
+                              <span className="text-red-600 mr-2">⚠️</span>
+                              <span className="text-red-800 font-medium">{alert}</span>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Course Details */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+                          <div>
+                            <Label>اسم الكورس *</Label>
+                            <Input
+                              value={course.courseName}
+                              onChange={(e) => updateTreatmentCourse(courseIndex, 'courseName', e.target.value)}
+                              placeholder="اسم الكورس العلاجي"
+                            />
+                          </div>
+                          <div>
+                            <Label>الكمية الإجمالية *</Label>
+                            <Input
+                              type="number"
+                              min="1"
+                              value={course.totalQuantity}
+                              onChange={(e) => updateTreatmentCourse(courseIndex, 'totalQuantity', parseInt(e.target.value) || 1)}
+                              placeholder="1"
+                            />
+                          </div>
+                          <div>
+                            <Label>المتاح في المخزون</Label>
+                            <Input
+                              type="number"
+                              value={course.availableInStock}
+                              disabled
+                              className="bg-gray-100"
+                            />
+                          </div>
+                          <div>
+                            <Label>الكمية المحجوزة</Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              value={course.reservedQuantity}
+                              disabled
+                              className="bg-gray-100"
+                            />
+                          </div>
+                          <div>
+                            <Label>الكمية المسلمة</Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              value={course.deliveredQuantity}
+                              disabled
+                              className="bg-gray-100"
+                            />
+                          </div>
+                          {/* حُذفت الكمية المتبقية بعد إضافة الكمية المحجوزة */}
+                          <div>
+                            <Label>الحالة</Label>
+                            <Select
+                              value={course.status}
+                              onValueChange={(value) => updateTreatmentCourse(courseIndex, 'status', value)}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="اختر الحالة" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="CREATED">تم إنشاء الكورس</SelectItem>
+                                <SelectItem value="RESERVED">تم حجز العلاج</SelectItem>
+                                <SelectItem value="DELIVERED">تم تسليم العلاج</SelectItem>
+                                <SelectItem value="IN_PROGRESS">جاري العلاج</SelectItem>
+                                <SelectItem value="COMPLETED">تم إكمال الكورس</SelectItem>
+                                <SelectItem value="CANCELLED">تم إلغاء الكورس</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <Label>تاريخ البداية *</Label>
+                            <Input
+                              type="date"
+                              value={course.startDate}
+                              onChange={(e) => updateTreatmentCourse(courseIndex, 'startDate', e.target.value)}
+                            />
+                          </div>
+                          <div>
+                            <Label>تاريخ النهاية</Label>
+                            <Input
+                              type="date"
+                              value={course.endDate || ''}
+                              onChange={(e) => updateTreatmentCourse(courseIndex, 'endDate', e.target.value)}
+                            />
+                          </div>
+                        </div>
+
+                        {/* إدارة الحجز والتسليم */}
+                        <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                          <h5 className="font-semibold text-blue-800 mb-3">إدارة الحجز والتسليم</h5>
+                          <div className="flex flex-wrap gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => reserveTreatment(courseIndex)}
+                              disabled={course.isReserved || course.availableInStock < course.totalQuantity}
+                              className="text-blue-600 hover:text-blue-700"
+                            >
+                              {course.isReserved ? '✓ محجوز' : 'حجز العلاج'}
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => deliverTreatment(courseIndex)}
+                              disabled={!course.isReserved || course.isDelivered}
+                              className="text-green-600 hover:text-green-700"
+                            >
+                              {course.isDelivered ? '✓ مسلم' : 'تسليم العلاج'}
+                            </Button>
+                            <div className="flex items-center gap-2 text-sm">
+                              <span className={`px-2 py-1 rounded ${course.isReserved ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+                                {course.isReserved ? 'محجوز' : 'غير محجوز'}
+                              </span>
+                              <span className={`px-2 py-1 rounded ${course.isDelivered ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+                                {course.isDelivered ? 'مسلم' : 'غير مسلم'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Description and Instructions */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                          <div>
+                            <Label>وصف الكورس</Label>
+                            <Textarea
+                              value={course.description}
+                              onChange={(e) => updateTreatmentCourse(courseIndex, 'description', e.target.value)}
+                              placeholder="وصف الكورس العلاجي..."
+                              rows={3}
+                            />
+                          </div>
+                          <div>
+                            <Label>التعليمات</Label>
+                            <Textarea
+                              value={course.instructions || ''}
+                              onChange={(e) => updateTreatmentCourse(courseIndex, 'instructions', e.target.value)}
+                              placeholder="تعليمات خاصة..."
+                              rows={3}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Doses Management */}
+                        <div className="border-t pt-4">
+                          <div className="flex items-center justify-between mb-3">
+                            <Label className="text-sm font-medium text-gray-700">
+                              الجرعات ({course.doses.length})
+                            </Label>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => addDoseToCourse(courseIndex)}
+                              className="text-green-600 hover:text-green-700"
+                            >
+                              <Plus className="w-4 h-4 mr-1" />
+                              إضافة جرعة
+                            </Button>
+                          </div>
+                          
+                          {course.doses.length === 0 ? (
+                            <div className="text-center py-4 text-gray-500 bg-gray-50 rounded-lg">
+                              لا توجد جرعات محددة
+                            </div>
+                          ) : (
+                            <div className="space-y-3">
+                              {course.doses.map((dose, doseIndex) => (
+                                <div key={doseIndex} className="p-3 bg-white border rounded-lg">
+                                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                                    <div>
+                                      <Label>رقم الجرعة</Label>
+                                      <Input
+                                        type="number"
+                                        value={dose.doseNumber}
+                                        disabled
+                                        className="bg-gray-100"
+                                      />
+                                    </div>
+                                    <div>
+                                      <Label>تاريخ الجرعة</Label>
+                                      <Input
+                                        type="date"
+                                        value={dose.scheduledDate}
+                                        onChange={(e) => updateDose(courseIndex, doseIndex, 'scheduledDate', e.target.value)}
+                                      />
+                                    </div>
+                                    <div>
+                                      <Label>وقت الجرعة</Label>
+                                      <Input
+                                        type="time"
+                                        value={dose.scheduledTime}
+                                        onChange={(e) => updateDose(courseIndex, doseIndex, 'scheduledTime', e.target.value)}
+                                      />
+                                    </div>
+                                    <div>
+                                      <Label>الكمية</Label>
+                                      <Input
+                                        type="number"
+                                        min="1"
+                                        value={dose.quantity}
+                                        onChange={(e) => updateDose(courseIndex, doseIndex, 'quantity', parseInt(e.target.value) || 1)}
+                                      />
+                                    </div>
+                                    <div>
+                                      <Label>الحالة</Label>
+                                      <Select
+                                        value={dose.status}
+                                        onValueChange={(value) => updateDose(courseIndex, doseIndex, 'status', value)}
+                                      >
+                                        <SelectTrigger>
+                                          <SelectValue placeholder="اختر الحالة" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="SCHEDULED">مجدول</SelectItem>
+                                          <SelectItem value="TAKEN">تم أخذه</SelectItem>
+                                          <SelectItem value="MISSED">فات الموعد</SelectItem>
+                                          <SelectItem value="SKIPPED">تم تخطيه</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                    <div className="flex items-end gap-1">
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => markDoseAsTaken(courseIndex, doseIndex)}
+                                        disabled={dose.isTaken}
+                                        className="text-green-600 hover:text-green-700"
+                                      >
+                                        {dose.isTaken ? '✓' : 'أخذ'}
+                                      </Button>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => markDoseAsMissed(courseIndex, doseIndex)}
+                                        disabled={dose.isTaken}
+                                        className="text-red-600 hover:text-red-700"
+                                      >
+                                        فات
+                                      </Button>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => removeDose(courseIndex, doseIndex)}
+                                        className="text-red-600 hover:text-red-700"
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                  
+                                  {/* معلومات الالتزام */}
+                                  {dose.isTaken && (
+                                    <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+                                        <div>
+                                          <Label className="text-green-800 font-medium">تاريخ الأخذ الفعلي</Label>
+                                          <Input
+                                            type="date"
+                                            value={dose.takenDate || ''}
+                                            disabled
+                                            className="bg-green-100"
+                                          />
+                                        </div>
+                                        <div>
+                                          <Label className="text-green-800 font-medium">وقت الأخذ الفعلي</Label>
+                                          <Input
+                                            type="time"
+                                            value={dose.takenAt || ''}
+                                            disabled
+                                            className="bg-green-100"
+                                          />
+                                        </div>
+                                        <div>
+                                          <Label className="text-green-800 font-medium">الالتزام بالموعد</Label>
+                                          <div className={`px-2 py-1 rounded text-center ${dose.isOnTime ? 'bg-green-200 text-green-800' : 'bg-yellow-200 text-yellow-800'}`}>
+                                            {dose.isOnTime ? '✓ في الموعد' : '⚠️ متأخر'}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+                                  <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <div>
+                                      <Label>ملاحظات الجرعة</Label>
+                                      <Textarea
+                                        value={dose.notes || ''}
+                                        onChange={(e) => updateDose(courseIndex, doseIndex, 'notes', e.target.value)}
+                                        placeholder="ملاحظات خاصة بالجرعة..."
+                                        rows={2}
+                                      />
+                                    </div>
+                                    <div>
+                                      <Label>الآثار الجانبية</Label>
+                                      <Textarea
+                                        value={dose.sideEffects || ''}
+                                        onChange={(e) => updateDose(courseIndex, doseIndex, 'sideEffects', e.target.value)}
+                                        placeholder="أي آثار جانبية ظهرت..."
+                                        rows={2}
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Notes */}
+                        <div className="mt-4">
+                          <Label>ملاحظات إضافية</Label>
+                          <Textarea
+                            value={course.notes || ''}
+                            onChange={(e) => updateTreatmentCourse(courseIndex, 'notes', e.target.value)}
+                            placeholder="ملاحظات إضافية..."
+                            rows={2}
+                          />
+                        </div>
                       </div>
-                      <div className="mt-2">
-                        <Label>وصف العلاج</Label>
-                        <Textarea
-                          value={treatment.description}
-                          onChange={(e) => updateTreatment(index, 'description', e.target.value)}
-                          placeholder="وصف العلاج..."
-                          rows={2}
-                        />
-                      </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
             </CardContent>

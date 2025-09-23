@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { UniversalTable } from '@/components/ui/universal-table'
 import { FormModal } from '@/components/ui/form-modal'
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
@@ -56,6 +56,11 @@ export default function PatientsPage() {
     description?: string
     type?: string
   }>>([])
+  const [availableTests, setAvailableTests] = useState<any[]>([])
+  const [selectedTests, setSelectedTests] = useState<any[]>([])
+  const [loadingTests, setLoadingTests] = useState(false)
+  const [idNumberError, setIdNumberError] = useState<string>('')
+  const [checkingIdNumber, setCheckingIdNumber] = useState<boolean>(false)
 
   // Debug: Log when patients change
   useEffect(() => {
@@ -66,19 +71,105 @@ export default function PatientsPage() {
   }
 
   const handleHospitalChange = (hospitalId: string) => {
+    console.log('🏥 Hospital changed to:', hospitalId)
     form.handleHospitalChange(hospitalId, doctors)
+    fetchAvailableTests(hospitalId)
+  }
+
+  const fetchAvailableTests = async (hospitalId: string) => {
+    try {
+      console.log('🔬 Fetching tests for hospital:', hospitalId)
+      setLoadingTests(true)
+      const response = await fetch(`/api/hospital-tests?hospitalId=${hospitalId}`)
+      if (!response.ok) throw new Error('Failed to fetch tests')
+      const data = await response.json()
+      console.log('🔬 Tests fetched:', data.data?.length || 0, 'tests')
+      setAvailableTests(data.data || [])
+    } catch (error) {
+      console.error('Error fetching tests:', error)
+      setAvailableTests([])
+    } finally {
+      setLoadingTests(false)
+    }
+  }
+
+  const addTest = (test: any) => {
+    if (!selectedTests.find(t => t.id === test.id)) {
+      setSelectedTests([...selectedTests, test])
+    }
+  }
+
+  const removeTest = (testId: string) => {
+    setSelectedTests(selectedTests.filter(t => t.id !== testId))
+  }
+
+  // Check ID number uniqueness
+  const checkIdNumberUniqueness = async (idNumber: string): Promise<boolean> => {
+    if (!idNumber || idNumber.trim() === '') {
+      setIdNumberError('')
+      return true
+    }
+
+    setCheckingIdNumber(true)
+    setIdNumberError('')
+
+    try {
+      const response = await fetch(`/api/patients?idNumber=${encodeURIComponent(idNumber.trim())}`)
+      const result = await response.json()
+
+      if (result.exists) {
+        const existingPatient = result.patient
+        // Don't show error if editing the same patient
+        if (editingPatient && existingPatient.id === editingPatient.id) {
+          setIdNumberError('')
+          return true
+        }
+        setIdNumberError(`رقم الهوية الوطنية مستخدم بالفعل للمريض ${existingPatient.firstName} ${existingPatient.lastName} (${existingPatient.patientNumber})`)
+        return false
+      } else {
+        setIdNumberError('')
+        return true
+      }
+    } catch (error) {
+      console.error('خطأ في التحقق من رقم الهوية:', error)
+      setIdNumberError('خطأ في التحقق من رقم الهوية')
+      return false
+    } finally {
+      setCheckingIdNumber(false)
+    }
+  }
+
+  // Debounced ID number check
+  const debouncedCheckIdNumber = useCallback(
+    debounce((idNumber: string) => {
+      checkIdNumberUniqueness(idNumber)
+    }, 500),
+    []
+  )
+
+  // Debounce utility function
+  function debounce<T extends (...args: any[]) => any>(func: T, wait: number): T {
+    let timeout: NodeJS.Timeout
+    return ((...args: any[]) => {
+      clearTimeout(timeout)
+      timeout = setTimeout(() => func(...args), wait)
+    }) as T
   }
 
   const handleAdd = () => {
     setEditingPatient(null)
     form.resetForm()
     setPatientImages([])
+    setAvailableTests([])
+    setSelectedTests([])
+    setIdNumberError('')
     setShowAddForm(true)
   }
 
   const handleEdit = (patient: Patient) => {
     setEditingPatient(patient)
     form.populateForm(patient)
+    setIdNumberError('')
     setShowAddForm(true)
   }
 
@@ -96,12 +187,32 @@ export default function PatientsPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
+    // Check if there's an ID number error
+    if (idNumberError) {
+      alert('يرجى إصلاح خطأ رقم الهوية الوطنية قبل المتابعة')
+      return
+    }
+
+    // Final check for ID number uniqueness before submission
+    if (form.formData.idNumber && form.formData.idNumber.trim()) {
+      const isUnique = await checkIdNumberUniqueness(form.formData.idNumber)
+      if (!isUnique) {
+        alert('رقم الهوية الوطنية مستخدم بالفعل')
+        return
+      }
+    }
+    
     const patientData = form.preparePatientData(form.formData)
 
     if (editingPatient) {
       await updatePatient(editingPatient.id, patientData)
     } else {
-      await createPatient(patientData)
+      // Include selected tests when creating new patient
+      const patientDataWithTests = {
+        ...patientData,
+        selectedTests: selectedTests
+      }
+      await createPatient(patientDataWithTests)
     }
   }
 
@@ -137,6 +248,17 @@ export default function PatientsPage() {
         </div>
       ),
       sortable: true
+    },
+    {
+      key: 'idNumber' as keyof Patient,
+      label: 'رقم الهوية الوطنية',
+      render: (value: string) => (
+        <span className="font-mono text-sm bg-green-100 text-green-800 px-2 py-1 rounded">
+          {value || 'غير محدد'}
+        </span>
+      ),
+      sortable: true,
+      searchable: true
     },
     {
       key: 'phone' as keyof Patient,
@@ -193,6 +315,12 @@ export default function PatientsPage() {
       label: 'فصيلة الدم',
       type: 'select' as const,
       options: bloodTypes.map(t => ({ value: t, label: t }))
+    },
+    {
+      key: 'idNumber',
+      label: 'رقم الهوية الوطنية',
+      type: 'text' as const,
+      placeholder: 'ابحث برقم الهوية الوطنية...'
     }
   ]
 
@@ -219,7 +347,7 @@ export default function PatientsPage() {
         title="إدارة المرضى"
         data={dataPatients}
         columns={columns}
-        searchFields={['firstName', 'lastName', 'patientNumber', 'phone', 'email']}
+        searchFields={['firstName', 'lastName', 'patientNumber', 'idNumber', 'phone', 'email']}
         filters={filters}
         onAdd={handleAdd}
         onEdit={handleEdit}
@@ -237,6 +365,7 @@ export default function PatientsPage() {
         title={editingPatient ? 'تعديل بيانات المريض' : 'إضافة مريض جديد'}
         onSubmit={handleSubmit}
         submitText={editingPatient ? 'حفظ التغييرات' : 'إضافة المريض'}
+        loading={patientsLoading || checkingIdNumber}
         size="xl"
       >
         {/* Basic Information */}
@@ -254,13 +383,6 @@ export default function PatientsPage() {
                 value={form.formData.lastName}
                 onChange={(value) => form.setFormData({ ...form.formData, lastName: value })}
                 placeholder="الاسم الأخير"
-              />
-            </FormField>
-            <FormField label="الاسم الأوسط">
-              <TextInput
-                value={form.formData.middleName}
-                onChange={(value) => form.setFormData({ ...form.formData, middleName: value })}
-                placeholder="الاسم الأوسط"
               />
             </FormField>
           </FormGrid>
@@ -299,14 +421,6 @@ export default function PatientsPage() {
                 value={form.formData.phone}
                 onChange={(value) => form.setFormData({ ...form.formData, phone: value })}
                 placeholder="رقم الهاتف"
-              />
-            </FormField>
-            <FormField label="البريد الإلكتروني">
-              <TextInput
-                type="email"
-                value={form.formData.email}
-                onChange={(value) => form.setFormData({ ...form.formData, email: value })}
-                placeholder="البريد الإلكتروني"
               />
             </FormField>
           </FormGrid>
@@ -375,6 +489,91 @@ export default function PatientsPage() {
           </FormField>
         </FormSection>
 
+        {/* Tests Selection */}
+        {form.selectedHospitalId && (
+          <FormSection title="اختيار الفحوصات (اختياري)">
+            <div className="space-y-4">
+              {/* Debug info */}
+              <div className="text-xs text-gray-500 mb-2">
+                Debug: selectedHospitalId = {form.selectedHospitalId}, availableTests = {availableTests.length}
+              </div>
+              {/* Available Tests */}
+              {availableTests.length > 0 && (
+                <div className="space-y-3">
+                  <FormField label="الفحوصات المتاحة">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-40 overflow-y-auto border rounded-lg p-3">
+                      {availableTests.map((test) => (
+                        <div
+                          key={test.id}
+                          className="flex items-center justify-between p-2 border rounded-lg hover:bg-gray-50"
+                        >
+                          <div className="flex-1">
+                            <div className="font-medium text-sm">{test.name}</div>
+                            <div className="text-xs text-gray-500">{test.category}</div>
+                            {test.description && (
+                              <div className="text-xs text-gray-400 mt-1">{test.description}</div>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => addTest(test)}
+                            className="ml-2 px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
+                          >
+                            إضافة
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </FormField>
+                </div>
+              )}
+
+              {/* Selected Tests */}
+              {selectedTests.length > 0 && (
+                <div className="space-y-3">
+                  <FormField label={`الفحوصات المختارة (${selectedTests.length})`}>
+                    <div className="space-y-2">
+                      {selectedTests.map((test) => (
+                        <div
+                          key={test.id}
+                          className="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg"
+                        >
+                          <div className="flex items-center">
+                            <div className="w-4 h-4 text-blue-600 mr-2">🔬</div>
+                            <div>
+                              <div className="font-medium text-sm">{test.name}</div>
+                              <div className="text-xs text-gray-500">{test.category}</div>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeTest(test.id)}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50 px-2 py-1 rounded"
+                          >
+                            حذف
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </FormField>
+                </div>
+              )}
+
+              {loadingTests && (
+                <div className="text-center py-4 text-gray-500">
+                  جاري تحميل الفحوصات...
+                </div>
+              )}
+
+              {!loadingTests && availableTests.length === 0 && form.selectedHospitalId && (
+                <div className="text-center py-4 text-gray-500">
+                  لا توجد فحوصات متاحة في هذا المستشفى
+                </div>
+              )}
+            </div>
+          </FormSection>
+        )}
+
         {/* Patient Images */}
         <FormSection title="صور المريض">
           <ImageUpload
@@ -404,19 +603,24 @@ export default function PatientsPage() {
                 options={nationalities.map(n => ({ value: n, label: n }))}
               />
             </FormField>
-            <FormField label="رقم الهوية">
-              <TextInput
-                value={form.formData.idNumber}
-                onChange={(value) => form.setFormData({ ...form.formData, idNumber: value })}
-                placeholder="رقم الهوية"
-              />
-            </FormField>
-            <FormField label="رقم جواز السفر">
-              <TextInput
-                value={form.formData.passportNumber}
-                onChange={(value) => form.setFormData({ ...form.formData, passportNumber: value })}
-                placeholder="رقم جواز السفر"
-              />
+            <FormField label="رقم الهوية الوطنية">
+              <div>
+                <TextInput
+                  value={form.formData.idNumber}
+                  onChange={(value) => {
+                    form.setFormData({ ...form.formData, idNumber: value })
+                    debouncedCheckIdNumber(value)
+                  }}
+                  placeholder="رقم الهوية الوطنية"
+                  className={idNumberError ? 'border-red-500' : ''}
+                />
+                {checkingIdNumber && (
+                  <div className="text-sm text-blue-600 mt-1">جاري التحقق...</div>
+                )}
+                {idNumberError && (
+                  <div className="text-sm text-red-600 mt-1">{idNumberError}</div>
+                )}
+              </div>
             </FormField>
           </FormGrid>
           <FormGrid cols={3}>
@@ -435,14 +639,6 @@ export default function PatientsPage() {
                 placeholder="المهنة"
               />
             </FormField>
-            <FormField label="المدينة">
-              <TextInput
-                value={cities.find(c => c.id === form.formData.cityId)?.name || ''}
-                onChange={() => {}} // Read-only, city is selected via dropdown
-                placeholder="المدينة"
-                disabled
-              />
-            </FormField>
           </FormGrid>
           <FormGrid cols={2}>
             <FormField label="رقم التأمين">
@@ -450,13 +646,6 @@ export default function PatientsPage() {
                 value={form.formData.insuranceNumber}
                 onChange={(value) => form.setFormData({ ...form.formData, insuranceNumber: value })}
                 placeholder="رقم التأمين"
-              />
-            </FormField>
-            <FormField label="شركة التأمين">
-              <TextInput
-                value={form.formData.insuranceCompany}
-                onChange={(value) => form.setFormData({ ...form.formData, insuranceCompany: value })}
-                placeholder="شركة التأمين"
               />
             </FormField>
           </FormGrid>

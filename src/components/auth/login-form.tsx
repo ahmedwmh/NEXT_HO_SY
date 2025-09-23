@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useMutation } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
+import { toast } from 'react-hot-toast'
 
 export function LoginForm() {
   const [isLoading, setIsLoading] = useState(false)
@@ -26,25 +27,34 @@ export function LoginForm() {
 
   const loginMutation = useMutation({
     mutationFn: async (data: LoginInput) => {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      })
+      try {
+        const response = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(data),
+        })
 
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.message || 'Login failed')
+        const result = await response.json()
+
+        if (!response.ok) {
+          throw new Error(result.message || 'Login failed')
+        }
+
+        return result
+      } catch (error) {
+        console.error('Login error:', error)
+        throw error
       }
-
-      return response.json()
     },
     onSuccess: (data) => {
       // Store user data in localStorage (in a real app, use proper auth state management)
       localStorage.setItem('user', JSON.stringify(data.data))
       localStorage.setItem('token', data.data.id) // Using user ID as token for simplicity
+      
+      // Show success message
+      toast.success(`Welcome back, ${data.data.email}!`)
       
       // Redirect based on role
       if (data.data.role === 'ADMIN') {
@@ -56,8 +66,15 @@ export function LoginForm() {
       }
     },
     onError: (error) => {
+      console.error('Login mutation error:', error)
+      const errorMessage = error.message || 'An error occurred during login'
+      
+      // Show error toast
+      toast.error(errorMessage)
+      
+      // Set form error
       setError('root', {
-        message: error.message,
+        message: errorMessage,
       })
     },
   })
@@ -66,6 +83,9 @@ export function LoginForm() {
     setIsLoading(true)
     try {
       await loginMutation.mutateAsync(data)
+    } catch (error) {
+      // Error is already handled by the mutation's onError callback
+      console.error('Submit error:', error)
     } finally {
       setIsLoading(false)
     }
@@ -113,7 +133,17 @@ export function LoginForm() {
 
           {errors.root && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-md">
-              <p className="text-sm text-red-600">{errors.root.message}</p>
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm text-red-600 font-medium">Login Failed</p>
+                  <p className="text-sm text-red-600">{errors.root.message}</p>
+                </div>
+              </div>
             </div>
           )}
 

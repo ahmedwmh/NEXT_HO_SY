@@ -90,12 +90,50 @@ export function ComprehensiveVisitForm({ patientId, patientName, isOpen, onClose
     
     // Results based on tests
     diseases: [] as { name: string; description: string; severity: string; status: string }[],
-    treatments: [] as { name: string; description: string; scheduledAt: string; status: string }[],
+    treatments: [] as { name: string; description: string; scheduledAt: string; status: string; quantity?: number; cost?: number; duration?: string; category?: string; notes?: string }[],
     operations: [] as { name: string; description: string; scheduledAt: string; status: string }[]
   })
 
   const [filteredHospitals, setFilteredHospitals] = useState<Hospital[]>([])
   const [filteredDoctors, setFilteredDoctors] = useState<Doctor[]>([])
+
+  // Fetch patient data for auto-fill
+  const { data: patientData } = useQuery({
+    queryKey: ['patient', patientId],
+    queryFn: async () => {
+      const response = await fetch(`/api/patients/${patientId}`)
+      const result = await response.json()
+      return result.success ? result.data : null
+    },
+    enabled: !!patientId && isOpen
+  })
+
+  // Auto-fill patient data function
+  const applyPatientData = async () => {
+    if (!patientData) return
+
+    console.log('🔄 Applying patient data to form:', patientData)
+    
+    setFormData(prev => ({
+      ...prev,
+      cityId: patientData.hospital?.city?.id || '',
+      hospitalId: patientData.hospitalId || '',
+      doctorIds: [], // Will be set when doctor is selected
+      scheduledAt: new Date().toISOString().slice(0, 16) // Current date/time
+    }))
+
+    // If patient has selected tests, add them to the form
+    if (patientData.tests && patientData.tests.length > 0) {
+      const testNames = patientData.tests.map((test: any) => test.name)
+      setFormData(prev => ({
+        ...prev,
+        selectedTests: testNames
+      }))
+      console.log('✅ Patient selected tests applied to form:', testNames.length)
+    }
+    
+    console.log('✅ Patient data applied to form successfully')
+  }
 
   // Load draft data when form opens
   useEffect(() => {
@@ -1128,9 +1166,30 @@ export function ComprehensiveVisitForm({ patientId, patientName, isOpen, onClose
         {currentStep === 1 && (
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center">
-                <Calendar className="h-5 w-5 ml-2" />
-                معلومات الزيارة الأساسية
+              <CardTitle className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <Calendar className="h-5 w-5 ml-2" />
+                  معلومات الزيارة الأساسية
+                </div>
+                {patientData && isNewVisit && (
+                  <div className="flex flex-col items-end space-y-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={applyPatientData}
+                      className="bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200"
+                    >
+                      <User className="w-4 h-4 ml-2" />
+                      تطبيق بيانات المريض
+                    </Button>
+                    {patientData.tests && patientData.tests.length > 0 && (
+                      <p className="text-xs text-gray-500 text-right">
+                        سيتم تطبيق {patientData.tests.length} فحص مختار للمريض
+                      </p>
+                    )}
+                  </div>
+                )}
               </CardTitle>
               <p className="text-sm text-gray-600 mt-2">
                 أدخل المعلومات الأساسية للزيارة. يمكنك حفظ هذه الخطوة مؤقتاً والعودة إليها لاحقاً.
@@ -1540,11 +1599,12 @@ export function ComprehensiveVisitForm({ patientId, patientName, isOpen, onClose
                   <p className="text-red-500 text-sm mb-4">{validationErrors.treatments}</p>
                 )}
                 {formData.treatments.map((treatment, index) => (
-                  <div key={index} className="p-4 border rounded-lg space-y-3 mb-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div key={index} className="p-4 border rounded-lg space-y-4 mb-4 bg-green-50">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                       <div>
+                        <Label>اسم العلاج *</Label>
                         <Input
-                          placeholder="اسم العلاج *"
+                          placeholder="اسم العلاج"
                           value={treatment.name}
                           onChange={(e) => {
                             const newTreatments = [...formData.treatments]
@@ -1558,9 +1618,32 @@ export function ComprehensiveVisitForm({ patientId, patientName, isOpen, onClose
                         )}
                       </div>
                       <div>
+                        <Label>فئة العلاج</Label>
+                        <Select
+                          value={treatment.category || ''}
+                          onValueChange={(value) => {
+                            const newTreatments = [...formData.treatments]
+                            newTreatments[index].category = value
+                            setFormData(prev => ({ ...prev, treatments: newTreatments }))
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="اختر فئة العلاج" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="دوائي">دوائي</SelectItem>
+                            <SelectItem value="فيزيائي">فيزيائي</SelectItem>
+                            <SelectItem value="نفسي">نفسي</SelectItem>
+                            <SelectItem value="جراحي">جراحي</SelectItem>
+                            <SelectItem value="أخرى">أخرى</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label>موعد العلاج *</Label>
                         <Input
                           type="datetime-local"
-                          placeholder="موعد العلاج *"
+                          placeholder="موعد العلاج"
                           value={treatment.scheduledAt}
                           onChange={(e) => {
                             const newTreatments = [...formData.treatments]
@@ -1573,45 +1656,109 @@ export function ComprehensiveVisitForm({ patientId, patientName, isOpen, onClose
                           <p className="text-red-500 text-xs mt-1">{validationErrors[`treatment_${index}_scheduledAt`]}</p>
                         )}
                       </div>
+                      <div>
+                        <Label>الكمية</Label>
+                        <Input
+                          type="number"
+                          min="1"
+                          placeholder="1"
+                          value={treatment.quantity || 1}
+                          onChange={(e) => {
+                            const newTreatments = [...formData.treatments]
+                            newTreatments[index].quantity = parseInt(e.target.value) || 1
+                            setFormData(prev => ({ ...prev, treatments: newTreatments }))
+                          }}
+                        />
+                      </div>
+                      <div>
+                        <Label>التكلفة (دينار)</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          placeholder="0.00"
+                          value={treatment.cost || 0}
+                          onChange={(e) => {
+                            const newTreatments = [...formData.treatments]
+                            newTreatments[index].cost = parseFloat(e.target.value) || 0
+                            setFormData(prev => ({ ...prev, treatments: newTreatments }))
+                          }}
+                        />
+                      </div>
+                      <div>
+                        <Label>المدة</Label>
+                        <Input
+                          placeholder="مثال: 7 أيام"
+                          value={treatment.duration || ''}
+                          onChange={(e) => {
+                            const newTreatments = [...formData.treatments]
+                            newTreatments[index].duration = e.target.value
+                            setFormData(prev => ({ ...prev, treatments: newTreatments }))
+                          }}
+                        />
+                      </div>
+                      <div>
+                        <Label>الحالة</Label>
+                        <Select
+                          value={treatment.status}
+                          onValueChange={(value) => {
+                            const newTreatments = [...formData.treatments]
+                            newTreatments[index].status = value
+                            setFormData(prev => ({ ...prev, treatments: newTreatments }))
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="حالة العلاج" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="SCHEDULED">مجدول</SelectItem>
+                            <SelectItem value="IN_PROGRESS">قيد التنفيذ</SelectItem>
+                            <SelectItem value="COMPLETED">مكتمل</SelectItem>
+                            <SelectItem value="CANCELLED">ملغي</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex items-end">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            const newTreatments = formData.treatments.filter((_, i) => i !== index)
+                            setFormData(prev => ({ ...prev, treatments: newTreatments }))
+                          }}
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
-                    <Textarea
-                      placeholder="وصف العلاج"
-                      value={treatment.description}
-                      onChange={(e) => {
-                        const newTreatments = [...formData.treatments]
-                        newTreatments[index].description = e.target.value
-                        setFormData(prev => ({ ...prev, treatments: newTreatments }))
-                      }}
-                    />
-                    <div className="flex gap-2">
-                      <Select
-                        value={treatment.status}
-                        onValueChange={(value) => {
-                          const newTreatments = [...formData.treatments]
-                          newTreatments[index].status = value
-                          setFormData(prev => ({ ...prev, treatments: newTreatments }))
-                        }}
-                      >
-                        <SelectTrigger className="flex-1">
-                          <SelectValue placeholder="حالة العلاج" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="SCHEDULED">مجدول</SelectItem>
-                          <SelectItem value="IN_PROGRESS">قيد التنفيذ</SelectItem>
-                          <SelectItem value="COMPLETED">مكتمل</SelectItem>
-                          <SelectItem value="CANCELLED">ملغي</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          const newTreatments = formData.treatments.filter((_, i) => i !== index)
-                          setFormData(prev => ({ ...prev, treatments: newTreatments }))
-                        }}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
+                    <div className="grid grid-cols-1 gap-3">
+                      <div>
+                        <Label>وصف العلاج</Label>
+                        <Textarea
+                          placeholder="وصف العلاج"
+                          value={treatment.description}
+                          onChange={(e) => {
+                            const newTreatments = [...formData.treatments]
+                            newTreatments[index].description = e.target.value
+                            setFormData(prev => ({ ...prev, treatments: newTreatments }))
+                          }}
+                          rows={2}
+                        />
+                      </div>
+                      <div>
+                        <Label>ملاحظات إضافية</Label>
+                        <Textarea
+                          placeholder="ملاحظات إضافية"
+                          value={treatment.notes || ''}
+                          onChange={(e) => {
+                            const newTreatments = [...formData.treatments]
+                            newTreatments[index].notes = e.target.value
+                            setFormData(prev => ({ ...prev, treatments: newTreatments }))
+                          }}
+                          rows={2}
+                        />
+                      </div>
                     </div>
                   </div>
                 ))}

@@ -64,53 +64,111 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { hospitalId, treatments } = await request.json()
+    const data = await request.json()
 
-    if (!hospitalId || !treatments || !Array.isArray(treatments)) {
-      return NextResponse.json(
-        { error: 'Hospital ID and treatments array are required' },
-        { status: 400 }
+    // Handle both single treatment and array of treatments
+    if (data.treatments && Array.isArray(data.treatments)) {
+      // Multiple treatments creation (legacy support)
+      const { hospitalId, treatments } = data
+
+      if (!hospitalId || !treatments || !Array.isArray(treatments)) {
+        return NextResponse.json(
+          { error: 'Hospital ID and treatments array are required' },
+          { status: 400 }
+        )
+      }
+
+      // Verify hospital exists
+      const hospital = await prisma.hospital.findUnique({
+        where: { id: hospitalId }
+      })
+
+      if (!hospital) {
+        return NextResponse.json(
+          { error: 'Hospital not found' },
+          { status: 404 }
+        )
+      }
+
+      // Create treatments
+      const createdTreatments = await Promise.all(
+        treatments.map((treatment: any) =>
+          prisma.hospitalTreatment.create({
+            data: {
+              hospitalId,
+              name: treatment.name,
+              description: treatment.description || '',
+              category: treatment.category,
+              duration: treatment.duration,
+              cost: treatment.cost || 0,
+              quantity: treatment.quantity,
+              expiredate: treatment.expiredate ? new Date(treatment.expiredate) : null,
+              isActive: true
+            }
+          })
+        )
       )
-    }
 
-    // Verify hospital exists
-    const hospital = await prisma.hospital.findUnique({
-      where: { id: hospitalId }
-    })
+      return NextResponse.json({
+        success: true,
+        data: createdTreatments,
+        message: 'Treatments created successfully'
+      })
+    } else {
+      // Single treatment creation
+      const { hospitalId, name, description, category, duration, cost, quantity, expiredate } = data
 
-    if (!hospital) {
-      return NextResponse.json(
-        { error: 'Hospital not found' },
-        { status: 404 }
-      )
-    }
+      if (!hospitalId || !name) {
+        return NextResponse.json(
+          { error: 'Hospital ID and name are required' },
+          { status: 400 }
+        )
+      }
 
-    // Create treatments
-    const createdTreatments = await Promise.all(
-      treatments.map((treatment: any) =>
-        prisma.hospitalTreatment.create({
-          data: {
-            hospitalId,
-            name: treatment.name,
-            description: treatment.description || '',
-            category: treatment.category,
-            duration: treatment.duration,
-            cost: treatment.cost || 0,
-            isActive: true
+      // Verify hospital exists
+      const hospital = await prisma.hospital.findUnique({
+        where: { id: hospitalId }
+      })
+
+      if (!hospital) {
+        return NextResponse.json(
+          { error: 'Hospital not found' },
+          { status: 404 }
+        )
+      }
+
+      // Create single treatment
+      const createdTreatment = await prisma.hospitalTreatment.create({
+        data: {
+          hospitalId,
+          name,
+          description: description || '',
+          category: category || '',
+          duration: duration || '',
+          cost: cost || 0,
+          quantity: quantity || null,
+          expiredate: expiredate ? new Date(expiredate) : null,
+          isActive: true
+        },
+        include: {
+          hospital: {
+            include: {
+              city: true
+            }
           }
-        })
-      )
-    )
+        }
+      })
 
-    return NextResponse.json({
-      success: true,
-      data: createdTreatments,
-      message: 'Treatments created successfully'
-    })
+      return NextResponse.json({
+        success: true,
+        data: createdTreatment,
+        message: 'Treatment created successfully'
+      })
+    }
   } catch (error) {
-    console.error('Error creating hospital treatments:', error)
+    console.error('Error creating hospital treatment:', error)
     return NextResponse.json(
-      { error: 'Failed to create treatments' },
+      { error: 'Failed to create treatment' },
       { status: 500 }
     )
   }

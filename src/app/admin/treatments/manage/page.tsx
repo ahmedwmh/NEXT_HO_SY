@@ -28,6 +28,8 @@ interface Treatment {
   description: string
   category: string
   duration: string
+  quantity?: number
+  expiredate?: string
   hospital: {
     id: string
     name: string
@@ -44,6 +46,8 @@ interface TreatmentForm {
   description: string
   category: string
   duration: string
+  quantity?: number
+  expiredate?: string
 }
 
 export default function TreatmentsManagementPage() {
@@ -62,7 +66,9 @@ export default function TreatmentsManagementPage() {
     name: '',
     description: '',
     category: '',
-    duration: ''
+    duration: '',
+    quantity: undefined,
+    expiredate: ''
   })
 
   useEffect(() => {
@@ -179,7 +185,9 @@ export default function TreatmentsManagementPage() {
       name: treatment.name,
       description: treatment.description,
       category: treatment.category,
-      duration: treatment.duration
+      duration: treatment.duration,
+      quantity: treatment.quantity,
+      expiredate: treatment.expiredate ? new Date(treatment.expiredate).toISOString().split('T')[0] : ''
     })
     setSelectedCityId(treatment.hospital.city.id)
     setSelectedHospitalId(treatment.hospital.id)
@@ -189,7 +197,7 @@ export default function TreatmentsManagementPage() {
 
   const handleCancel = () => {
     setEditingTreatment(null)
-    setNewTreatment({ name: '', description: '', category: '', duration: '' })
+    setNewTreatment({ name: '', description: '', category: '', duration: '', quantity: undefined, expiredate: '' })
     setSelectedCityId('')
     setSelectedHospitalId('')
     setHospitals([])
@@ -235,6 +243,24 @@ export default function TreatmentsManagementPage() {
       sortable: true,
       render: (value: string) => (
         <span className="text-sm text-gray-600">{value || 'غير محدد'}</span>
+      )
+    },
+    {
+      key: 'quantity',
+      label: 'الكمية',
+      sortable: true,
+      render: (value: number) => (
+        <span className="text-sm text-gray-600">{value || 'غير محدد'}</span>
+      )
+    },
+    {
+      key: 'expiredate',
+      label: 'تاريخ الانتهاء',
+      sortable: true,
+      render: (value: string) => (
+        <span className="text-sm text-gray-600">
+          {value ? new Date(value).toLocaleDateString('ar-IQ') : 'غير محدد'}
+        </span>
       )
     },
     {
@@ -403,14 +429,37 @@ export default function TreatmentsManagementPage() {
                 </div>
               </div>
 
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="duration">المدة</Label>
+                  <Input
+                    id="duration"
+                    value={newTreatment.duration}
+                    onChange={(e) => setNewTreatment({...newTreatment, duration: e.target.value})}
+                    placeholder="مثال: 6-8 أسابيع"
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="quantity">الكمية</Label>
+                  <Input
+                    id="quantity"
+                    type="number"
+                    min="0"
+                    value={newTreatment.quantity || ''}
+                    onChange={(e) => setNewTreatment({...newTreatment, quantity: e.target.value ? parseInt(e.target.value) : undefined})}
+                    placeholder="مثال: 100"
+                  />
+                </div>
+              </div>
+
               <div>
-                <Label htmlFor="duration">المدة</Label>
+                <Label htmlFor="expiredate">تاريخ انتهاء الصلاحية</Label>
                 <Input
-                  id="duration"
-                  value={newTreatment.duration}
-                  onChange={(e) => setNewTreatment({...newTreatment, duration: e.target.value})}
-                  placeholder="مثال: 6-8 أسابيع"
-                  required
+                  id="expiredate"
+                  type="date"
+                  value={newTreatment.expiredate || ''}
+                  onChange={(e) => setNewTreatment({...newTreatment, expiredate: e.target.value})}
                 />
               </div>
 

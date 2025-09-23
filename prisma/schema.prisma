@@ -106,6 +106,7 @@ model Hospital {
   hospitalTests      HospitalTest[]
   hospitalTreatments HospitalTreatment[]
   hospitalOperations HospitalOperation[]
+  treatmentCourses   TreatmentCourse[] // الكورسات العلاجية
 
   @@index([cityId])
   @@index([name])
@@ -134,6 +135,7 @@ model Doctor {
   medications Medication[]
   prescriptions Prescription[]
   visitDrafts VisitDraft[]
+  treatmentCourses TreatmentCourse[] // الكورسات العلاجية
 
   @@index([hospitalId])
   @@index([specialization])
@@ -206,6 +208,7 @@ model Patient {
   prescriptions Prescription[]
   images      PatientImage[] // صور إضافية للمريض
   visitDrafts VisitDraft[] // مسودات الزيارات
+  treatmentCourses TreatmentCourse[] // الكورسات العلاجية
 
   @@index([cityId])
   @@index([hospitalId])
@@ -711,6 +714,8 @@ model HospitalTreatment {
   category    String?  // فئة العلاج (دوائي، فيزيائي، إلخ)
   duration    String?  // مدة العلاج
   cost        Decimal? // تكلفة العلاج
+  quantity    Int?     // الكمية المتاحة
+  expiredate  DateTime? // تاريخ انتهاء الصلاحية
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -722,7 +727,11 @@ model HospitalTreatment {
   @@index([name])
   @@index([category])
   @@index([isActive])
+  @@index([expiredate])
   @@map("hospital_treatments")
+  
+  // Relations
+  treatmentCourses TreatmentCourse[] // الكورسات العلاجية
 }
 
 model HospitalOperation {
@@ -745,5 +754,99 @@ model HospitalOperation {
   @@index([category])
   @@index([isActive])
   @@map("hospital_operations")
+}
+
+// ===== TREATMENT COURSE SYSTEM =====
+// نظام الكورس العلاجي لمتابعة المريض
+
+enum TreatmentCourseStatus {
+  CREATED      // تم إنشاء الكورس
+  RESERVED     // تم حجز العلاج
+  DELIVERED    // تم تسليم العلاج
+  IN_PROGRESS  // جاري العلاج
+  COMPLETED    // تم إكمال الكورس
+  CANCELLED    // تم إلغاء الكورس
+}
+
+enum TreatmentDoseStatus {
+  SCHEDULED    // مجدول
+  TAKEN        // تم أخذه
+  MISSED       // فات الموعد
+  SKIPPED      // تم تخطيه
+}
+
+model TreatmentCourse {
+  id              String                @id @default(cuid())
+  patientId       String
+  doctorId        String
+  hospitalId      String
+  hospitalTreatmentId String            // ربط بالعلاج من المخزون
+  courseName      String                // اسم الكورس العلاجي
+  description     String?               // وصف الكورس
+  // إدارة المخزون والكميات
+  totalQuantity   Int                   // الكمية الإجمالية المطلوبة
+  reservedQuantity Int                  @default(0) // الكمية المحجوزة
+  deliveredQuantity Int                 @default(0) // الكمية المسلمة
+  remainingQuantity Int                 // الكمية المتبقية
+  availableInStock Int                  @default(0) // الكمية المتاحة في المخزون
+  // التواريخ
+  startDate       DateTime              // تاريخ بداية الكورس
+  endDate         DateTime?             // تاريخ نهاية الكورس المتوقع
+  // الحالة والمتابعة
+  status          TreatmentCourseStatus @default(CREATED)
+  isReserved      Boolean               @default(false) // هل تم حجز الدواء؟
+  isDelivered     Boolean               @default(false) // هل تم تسليم الدواء؟
+  // التفاصيل الإضافية
+  instructions    String?               // تعليمات خاصة
+  notes           String?               // ملاحظات
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  // Relations
+  patient           Patient             @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  doctor            Doctor              @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  hospital          Hospital            @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  hospitalTreatment HospitalTreatment   @relation(fields: [hospitalTreatmentId], references: [id], onDelete: Cascade)
+  doses             TreatmentDose[]     // جرعات العلاج
+
+  @@index([patientId])
+  @@index([doctorId])
+  @@index([hospitalId])
+  @@index([hospitalTreatmentId])
+  @@index([status])
+  @@index([startDate])
+  @@index([endDate])
+  @@map("treatment_courses")
+}
+
+model TreatmentDose {
+  id                String              @id @default(cuid())
+  courseId          String
+  doseNumber        Int                 // رقم الجرعة (1, 2, 3...)
+  // جدولة الجرعة
+  scheduledDate     DateTime            // تاريخ الجرعة المجدول
+  scheduledTime     String?             // وقت الجرعة (صباح، مساء، إلخ)
+  quantity          Int                 // كمية هذه الجرعة
+  // تتبع الالتزام
+  status            TreatmentDoseStatus @default(SCHEDULED)
+  takenAt           String?             // وقت أخذ الجرعة الفعلي (HH:MM)
+  takenDate         DateTime?           // تاريخ أخذ الجرعة الفعلي
+  isTaken           Boolean             @default(false) // هل تم أخذ الجرعة؟
+  isOnTime          Boolean             @default(false) // هل تم أخذها في الموعد؟
+  // التفاصيل الإضافية
+  notes             String?             // ملاحظات على الجرعة
+  sideEffects       String?             // آثار جانبية (إن وجدت)
+  takenBy           String?             // من سلم الجرعة
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  // Relations
+  course TreatmentCourse @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@index([courseId])
+  @@index([scheduledDate])
+  @@index([status])
+  @@index([doseNumber])
+  @@map("treatment_doses")
 }
 
