@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import { useDoctorDataFilter } from '@/hooks/use-doctor-data'
 import { ArrowRight, UserPlus } from 'lucide-react'
 
 interface City {
@@ -16,6 +17,7 @@ interface City {
 
 export default function AddPatientPage() {
   const router = useRouter()
+  const { hospitalId, cityId, getDefaultFormValues, filteredData } = useDoctorDataFilter()
   const [cities, setCities] = useState<City[]>([])
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({
@@ -41,23 +43,29 @@ export default function AddPatientPage() {
   })
 
   useEffect(() => {
-    fetchCities()
-  }, [])
-
-  const fetchCities = async () => {
-    try {
-      const response = await fetch('/api/cities')
-      const data = await response.json()
-      setCities(data.data || data || [])
-    } catch (error) {
-      console.error('خطأ في جلب المدن:', error)
+    // Set default values from doctor's data
+    const defaults = getDefaultFormValues()
+    setFormData(prev => ({
+      ...prev,
+      cityId: defaults.cityId,
+      hospitalId: defaults.hospitalId
+    }))
+    
+    // Load cities (only doctor's city)
+    if (filteredData.cities) {
+      setCities(filteredData.cities)
     }
-  }
+  }, [getDefaultFormValues, filteredData.cities])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!formData.firstName.trim() || !formData.lastName.trim() || !formData.dateOfBirth || !formData.gender || !formData.cityId) {
       alert('يرجى ملء جميع الحقول المطلوبة')
+      return
+    }
+
+    if (!hospitalId) {
+      alert('خطأ: لا يمكن تحديد المستشفى')
       return
     }
 
@@ -68,8 +76,7 @@ export default function AddPatientPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...formData,
-          // In a real app, this would be the doctor's hospital ID
-          hospitalId: 'hospital-1'
+          hospitalId: hospitalId
         })
       })
 
@@ -210,7 +217,7 @@ export default function AddPatientPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium mb-2">المدينة *</label>
-                <Select value={formData.cityId} onValueChange={(value) => setFormData({ ...formData, cityId: value })}>
+                <Select value={formData.cityId} disabled>
                   <SelectTrigger>
                     <SelectValue placeholder="اختر المدينة" />
                   </SelectTrigger>
@@ -222,6 +229,7 @@ export default function AddPatientPage() {
                     ))}
                   </SelectContent>
                 </Select>
+                <p className="text-sm text-gray-500 mt-1">المدينة محددة تلقائياً حسب مستشفاك</p>
               </div>
               <div>
                 <label className="block text-sm font-medium mb-2">العنوان</label>

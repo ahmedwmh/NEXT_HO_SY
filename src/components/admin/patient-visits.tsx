@@ -279,7 +279,7 @@ export function PatientVisits({ patientId }: PatientVisitsProps) {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center space-x-2 rtl:space-x-reverse mb-2">
                         <h3 className="text-lg font-semibold text-gray-900">
-                          {new Date(visit.date).toLocaleDateString('ar-IQ')} - {visit.time}
+                          {new Date(visit.date).toLocaleDateString('ar-SA', { calendar: 'gregory' })} - {visit.time}
                         </h3>
                         <Badge className={`text-xs ${getTypeColor(visit.type)}`}>
                           {getTypeLabel(visit.type)}

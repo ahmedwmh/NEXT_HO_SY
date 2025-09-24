@@ -131,75 +131,102 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (hospitalTreatment.quantity && hospitalTreatment.quantity < totalQuantity) {
+    // Calculate available quantity (total - reserved - delivered)
+    const availableQuantity = (hospitalTreatment.quantity || 0) - 
+                             (hospitalTreatment.reservedQuantity || 0) - 
+                             (hospitalTreatment.deliveredQuantity || 0)
+
+    if (availableQuantity < totalQuantity) {
       return NextResponse.json(
-        { error: 'Insufficient quantity in hospital inventory' },
+        { 
+          error: `Insufficient quantity in hospital inventory. Available: ${availableQuantity}, Required: ${totalQuantity}`,
+          availableQuantity,
+          requiredQuantity: totalQuantity
+        },
         { status: 400 }
       )
     }
 
-    // Create treatment course
-    const course = await prisma.treatmentCourse.create({
-      data: {
-        patientId,
-        doctorId,
-        hospitalId,
-        hospitalTreatmentId,
-        courseName,
-        description,
-        totalQuantity,
-        reservedQuantity,
-        deliveredQuantity,
-        remainingQuantity: totalQuantity - deliveredQuantity,
-        availableInStock,
-        startDate: new Date(startDate),
-        endDate: endDate ? new Date(endDate) : null,
-        status: status as any,
-        isReserved,
-        isDelivered,
-        instructions,
-        notes
-      },
-      include: {
-        patient: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            patientNumber: true
-          }
+    // Use transaction to ensure data consistency
+    const result = await prisma.$transaction(async (tx) => {
+      // Create treatment course
+      const course = await tx.treatmentCourse.create({
+        data: {
+          patientId,
+          doctorId,
+          hospitalId,
+          hospitalTreatmentId,
+          courseName,
+          description,
+          totalQuantity,
+          reservedQuantity,
+          deliveredQuantity,
+          remainingQuantity: totalQuantity - deliveredQuantity,
+          availableInStock: availableQuantity - totalQuantity,
+          startDate: new Date(startDate),
+          endDate: endDate ? new Date(endDate) : null,
+          status: status as any,
+          isReserved,
+          isDelivered,
+          instructions,
+          notes
         },
-        doctor: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            specialization: true
-          }
-        },
-        hospital: {
-          select: {
-            id: true,
-            name: true
-          }
-        },
-        hospitalTreatment: {
-          select: {
-            id: true,
-            name: true,
-            category: true,
-            quantity: true,
-            expiredate: true
+        include: {
+          patient: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              patientNumber: true
+            }
+          },
+          doctor: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              specialization: true
+            }
+          },
+          hospital: {
+            select: {
+              id: true,
+              name: true
+            }
+          },
+          hospitalTreatment: {
+            select: {
+              id: true,
+              name: true,
+              category: true,
+              quantity: true,
+              expiredate: true
+            }
           }
         }
-      }
+      })
+
+      // Update hospital treatment inventory
+      await tx.hospitalTreatment.update({
+        where: { id: hospitalTreatmentId },
+        data: {
+          reservedQuantity: {
+            increment: reservedQuantity
+          },
+          deliveredQuantity: {
+            increment: deliveredQuantity
+          }
+        }
+      })
+
+      return course
     })
 
     // Create doses if provided
     if (doses && Array.isArray(doses)) {
       await prisma.treatmentDose.createMany({
         data: doses.map((dose: any, index: number) => ({
-          courseId: course.id,
+          courseId: result.id,
           doseNumber: index + 1,
           scheduledDate: new Date(dose.scheduledDate),
           scheduledTime: dose.scheduledTime,
@@ -218,7 +245,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      data: course,
+      data: result,
       message: 'Treatment course created successfully'
     })
   } catch (error) {

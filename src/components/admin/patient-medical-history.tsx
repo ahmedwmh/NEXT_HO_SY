@@ -260,7 +260,7 @@ export function PatientMedicalHistory({ patientId }: PatientMedicalHistoryProps)
                       <div className="flex flex-wrap items-center gap-2 text-sm text-gray-500">
                         <div className="flex items-center space-x-1 rtl:space-x-reverse">
                           <Calendar className="h-3 w-3" />
-                          <span>{new Date(record.date).toLocaleDateString('ar-IQ')}</span>
+                          <span>{new Date(record.date).toLocaleDateString('ar-SA', { calendar: 'gregory' })}</span>
                         </div>
                         <span>•</span>
                         <span>د. {record.doctor}</span>

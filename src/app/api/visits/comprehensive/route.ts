@@ -95,24 +95,40 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    // If this is a complete visit, add related data
-    if (status === 'COMPLETED' && tests && tests.length > 0) {
-      await prisma.test.createMany({
-        data: tests.map((test: any) => ({
-          visitId: visit.id,
+    // Add related data for both COMPLETED and DRAFT visits
+    if (tests && tests.length > 0) {
+      // Check for existing tests to avoid duplicates
+      const existingTests = await prisma.test.findMany({
+        where: {
           patientId,
-          doctorId: doctorId || 'temp-doctor',
-          hospitalId: normalizedHospitalId || 'temp-hospital',
-          name: test.name,
-          description: test.description || '',
-          scheduledAt: new Date(test.scheduledAt || scheduledAt),
-          results: test.results || null,
-          notes: test.notes || null
-        }))
+          visitId: visit.id,
+          name: { in: tests.map((t: any) => t.name) }
+        }
       })
+
+      // Filter out tests that already exist
+      const newTests = tests.filter((test: any) => 
+        !existingTests.some(existing => existing.name === test.name)
+      )
+
+      if (newTests.length > 0) {
+        await prisma.test.createMany({
+          data: newTests.map((test: any) => ({
+            visitId: visit.id,
+            patientId,
+            doctorId: doctorId || 'temp-doctor',
+            hospitalId: normalizedHospitalId || 'temp-hospital',
+            name: test.name,
+            description: test.description || '',
+            scheduledAt: new Date(test.scheduledAt || scheduledAt),
+            results: test.results || null,
+            notes: test.notes || null
+          }))
+        })
+      }
     }
 
-    if (status === 'COMPLETED' && diseases && diseases.length > 0) {
+    if (diseases && diseases.length > 0) {
       await prisma.disease.createMany({
         data: diseases.map((d: any) => ({
           patientId,
@@ -126,7 +142,7 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    if (status === 'COMPLETED' && treatments && treatments.length > 0) {
+    if (treatments && treatments.length > 0) {
       await prisma.treatment.createMany({
         data: treatments.map((treatment: any) => ({
           visitId: visit.id,
@@ -141,7 +157,7 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    if (status === 'COMPLETED' && operations && operations.length > 0) {
+    if (operations && operations.length > 0) {
       await prisma.operation.createMany({
         data: operations.map((operation: any) => ({
           visitId: visit.id,
@@ -156,7 +172,7 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    if (status === 'COMPLETED' && medications && medications.length > 0) {
+    if (medications && medications.length > 0) {
       await prisma.medication.createMany({
         data: medications.map((medication: any) => ({
           visitId: visit.id,
@@ -173,38 +189,88 @@ export async function POST(request: NextRequest) {
     }
 
     // Create treatment courses if provided
-    if (status === 'COMPLETED' && treatmentCourses && treatmentCourses.length > 0) {
+    if (treatmentCourses && treatmentCourses.length > 0) {
       console.log('💊 Creating treatment courses:', treatmentCourses.length)
       
       for (const course of treatmentCourses) {
-        const treatmentCourse = await prisma.treatmentCourse.create({
-          data: {
-            patientId,
-            doctorId: doctorId || 'temp-doctor',
-            hospitalId: normalizedHospitalId || 'temp-hospital',
-            hospitalTreatmentId: course.hospitalTreatmentId,
-            courseName: course.courseName,
-            description: course.description || '',
-            totalQuantity: course.totalQuantity || 0,
-            reservedQuantity: course.reservedQuantity || 0,
-            deliveredQuantity: course.deliveredQuantity || 0,
-            remainingQuantity: course.remainingQuantity || 0,
-            availableInStock: course.availableInStock || 0,
-            startDate: new Date(course.startDate || new Date()),
-            endDate: course.endDate ? new Date(course.endDate) : null,
-            status: course.status || 'CREATED',
-            isReserved: course.isReserved || false,
-            isDelivered: course.isDelivered || false,
-            instructions: course.instructions || '',
-            notes: course.notes || ''
-          }
+        // Check if hospital treatment exists and has enough quantity
+        const hospitalTreatment = await prisma.hospitalTreatment.findUnique({
+          where: { id: course.hospitalTreatmentId }
+        })
+
+        if (!hospitalTreatment) {
+          console.error('❌ Hospital treatment not found:', course.hospitalTreatmentId)
+          continue
+        }
+
+        // Calculate available quantity (total - reserved - delivered)
+        const availableQuantity = (hospitalTreatment.quantity || 0) - 
+                                 (hospitalTreatment.reservedQuantity || 0) - 
+                                 (hospitalTreatment.deliveredQuantity || 0)
+
+        console.log(`📊 Inventory check for ${course.courseName}:`)
+        console.log(`   - Total: ${hospitalTreatment.quantity}`)
+        console.log(`   - Reserved: ${hospitalTreatment.reservedQuantity}`)
+        console.log(`   - Delivered: ${hospitalTreatment.deliveredQuantity}`)
+        console.log(`   - Available: ${availableQuantity}`)
+        console.log(`   - Required: ${course.totalQuantity}`)
+
+        if (availableQuantity < course.totalQuantity) {
+          console.error(`❌ Insufficient quantity for ${course.courseName}. Available: ${availableQuantity}, Required: ${course.totalQuantity}`)
+          continue
+        }
+
+        // Use transaction to ensure data consistency
+        const result = await prisma.$transaction(async (tx) => {
+          // Create treatment course
+          const treatmentCourse = await tx.treatmentCourse.create({
+            data: {
+              patientId,
+              doctorId: doctorId || 'temp-doctor',
+              hospitalId: normalizedHospitalId || 'temp-hospital',
+              hospitalTreatmentId: course.hospitalTreatmentId,
+              courseName: course.courseName,
+              description: course.description || '',
+              totalQuantity: course.totalQuantity || 0,
+              reservedQuantity: course.reservedQuantity || 0,
+              deliveredQuantity: course.deliveredQuantity || 0,
+              remainingQuantity: course.remainingQuantity || 0,
+              availableInStock: availableQuantity - (course.totalQuantity || 0),
+              startDate: new Date(course.startDate || new Date()),
+              endDate: course.endDate ? new Date(course.endDate) : null,
+              status: course.status || 'CREATED',
+              isReserved: course.isReserved || false,
+              isDelivered: course.isDelivered || false,
+              instructions: course.instructions || '',
+              notes: course.notes || ''
+            }
+          })
+
+          // Update hospital treatment inventory - FIXED: Use totalQuantity instead of reservedQuantity
+          await tx.hospitalTreatment.update({
+            where: { id: course.hospitalTreatmentId },
+            data: {
+              reservedQuantity: {
+                increment: course.totalQuantity || 0  // Use totalQuantity for reservation
+              },
+              deliveredQuantity: {
+                increment: course.deliveredQuantity || 0
+              }
+            }
+          })
+
+          console.log(`✅ Updated inventory for ${course.courseName}:`)
+          console.log(`   - Reserved: +${course.totalQuantity}`)
+          console.log(`   - Delivered: +${course.deliveredQuantity}`)
+
+          return treatmentCourse
         })
 
         // Create doses if provided
         if (course.doses && course.doses.length > 0) {
           await prisma.treatmentDose.createMany({
             data: course.doses.map((dose: any, index: number) => ({
-              courseId: treatmentCourse.id,
+              courseId: result.id,
               doseNumber: dose.doseNumber || (index + 1),
               scheduledDate: new Date(dose.scheduledDate || dose.scheduledAt || new Date()),
               scheduledTime: dose.scheduledTime || '',
@@ -333,19 +399,48 @@ export async function PUT(request: NextRequest) {
       }
     })
 
-    // If this is a complete visit, add related data
-    if (status === 'COMPLETED') {
-      // Delete existing related data
-      await prisma.test.deleteMany({ where: { patientId } })
-      await prisma.treatment.deleteMany({ where: { patientId } })
-      await prisma.operation.deleteMany({ where: { patientId } })
-      await prisma.medication.deleteMany({ where: { patientId } })
-      await prisma.treatmentCourse.deleteMany({ where: { patientId } })
+    // Delete existing related data for this visit
+    await prisma.test.deleteMany({ where: { visitId: id } })
+    await prisma.treatment.deleteMany({ where: { visitId: id } })
+    await prisma.operation.deleteMany({ where: { visitId: id } })
+    await prisma.medication.deleteMany({ where: { visitId: id } })
+    await prisma.treatmentCourse.deleteMany({ where: { patientId } })
+    
+    // Create diseases if provided
+    if (diseases && diseases.length > 0) {
+      await prisma.disease.createMany({
+        data: diseases.map((d: any) => ({
+          patientId,
+          name: d.name,
+          description: d.description || '',
+          diagnosedAt: new Date(d.diagnosedAt || scheduledAt),
+          severity: d.severity || null,
+          status: d.status || 'Active',
+          notes: d.notes || null,
+        }))
+      })
+    }
 
-      // Add new related data
-      if (tests && tests.length > 0) {
+    // Add new related data
+    if (tests && tests.length > 0) {
+      // Check for existing tests to avoid duplicates
+      const existingTests = await prisma.test.findMany({
+        where: {
+          patientId,
+          visitId: id,
+          name: { in: tests.map((t: any) => t.name) }
+        }
+      })
+
+      // Filter out tests that already exist
+      const newTests = tests.filter((test: any) => 
+        !existingTests.some(existing => existing.name === test.name)
+      )
+
+      if (newTests.length > 0) {
         await prisma.test.createMany({
-          data: tests.map((test: any) => ({
+          data: newTests.map((test: any) => ({
+            visitId: id,
             patientId,
             doctorId: doctorId || '',
             hospitalId: hospitalId || '',
@@ -357,56 +452,90 @@ export async function PUT(request: NextRequest) {
           }))
         })
       }
+    }
 
-      if (treatments && treatments.length > 0) {
-        await prisma.treatment.createMany({
-          data: treatments.map((treatment: any) => ({
-            patientId,
-            doctorId: doctorId || '',
-            hospitalId: hospitalId || '',
-            name: treatment.name,
-            description: treatment.description || '',
-            scheduledAt: new Date(treatment.scheduledAt),
-            notes: treatment.notes || null
-          }))
+    if (treatments && treatments.length > 0) {
+      await prisma.treatment.createMany({
+        data: treatments.map((treatment: any) => ({
+          visitId: id,
+          patientId,
+          doctorId: doctorId || '',
+          hospitalId: hospitalId || '',
+          name: treatment.name,
+          description: treatment.description || '',
+          scheduledAt: new Date(treatment.scheduledAt),
+          notes: treatment.notes || null
+        }))
+      })
+    }
+
+    if (operations && operations.length > 0) {
+      await prisma.operation.createMany({
+        data: operations.map((operation: any) => ({
+          visitId: id,
+          patientId,
+          doctorId: doctorId || '',
+          hospitalId: hospitalId || '',
+          name: operation.name,
+          description: operation.description || '',
+          scheduledAt: new Date(operation.scheduledAt),
+          notes: operation.notes || null
+        }))
+      })
+    }
+
+    if (medications && medications.length > 0) {
+      await prisma.medication.createMany({
+        data: medications.map((medication: any) => ({
+          visitId: id,
+          patientId,
+          doctorId: doctorId || '',
+          hospitalId: hospitalId || '',
+          name: medication.name,
+          dosage: medication.dosage || '',
+          instructions: medication.instructions || '',
+          startDate: new Date(medication.startDate),
+          endDate: medication.endDate ? new Date(medication.endDate) : null
+        }))
+      })
+    }
+
+    // Create treatment courses if provided
+    if (treatmentCourses && treatmentCourses.length > 0) {
+      console.log('💊 Creating treatment courses:', treatmentCourses.length)
+      
+      for (const course of treatmentCourses) {
+        // Check if hospital treatment exists and has enough quantity
+        const hospitalTreatment = await prisma.hospitalTreatment.findUnique({
+          where: { id: course.hospitalTreatmentId }
         })
-      }
 
-      if (operations && operations.length > 0) {
-        await prisma.operation.createMany({
-          data: operations.map((operation: any) => ({
-            patientId,
-            doctorId: doctorId || '',
-            hospitalId: hospitalId || '',
-            name: operation.name,
-            description: operation.description || '',
-            scheduledAt: new Date(operation.scheduledAt),
-            notes: operation.notes || null
-          }))
-        })
-      }
+        if (!hospitalTreatment) {
+          console.error('❌ Hospital treatment not found:', course.hospitalTreatmentId)
+          continue
+        }
 
-      if (medications && medications.length > 0) {
-        await prisma.medication.createMany({
-          data: medications.map((medication: any) => ({
-            patientId,
-            doctorId: doctorId || '',
-            hospitalId: hospitalId || '',
-            name: medication.name,
-            dosage: medication.dosage || '',
-            instructions: medication.instructions || '',
-            startDate: new Date(medication.startDate),
-            endDate: medication.endDate ? new Date(medication.endDate) : null
-          }))
-        })
-      }
+        // Calculate available quantity (total - reserved - delivered)
+        const availableQuantity = (hospitalTreatment.quantity || 0) - 
+                                 (hospitalTreatment.reservedQuantity || 0) - 
+                                 (hospitalTreatment.deliveredQuantity || 0)
 
-      // Create treatment courses if provided
-      if (treatmentCourses && treatmentCourses.length > 0) {
-        console.log('💊 Creating treatment courses:', treatmentCourses.length)
-        
-        for (const course of treatmentCourses) {
-          const treatmentCourse = await prisma.treatmentCourse.create({
+        console.log(`📊 Inventory check for ${course.courseName}:`)
+        console.log(`   - Total: ${hospitalTreatment.quantity}`)
+        console.log(`   - Reserved: ${hospitalTreatment.reservedQuantity}`)
+        console.log(`   - Delivered: ${hospitalTreatment.deliveredQuantity}`)
+        console.log(`   - Available: ${availableQuantity}`)
+        console.log(`   - Required: ${course.totalQuantity}`)
+
+        if (availableQuantity < course.totalQuantity) {
+          console.error(`❌ Insufficient quantity for ${course.courseName}. Available: ${availableQuantity}, Required: ${course.totalQuantity}`)
+          continue
+        }
+
+        // Use transaction to ensure data consistency
+        const result = await prisma.$transaction(async (tx) => {
+          // Create treatment course
+          const treatmentCourse = await tx.treatmentCourse.create({
             data: {
               patientId,
               doctorId: doctorId || 'temp-doctor',
@@ -418,7 +547,7 @@ export async function PUT(request: NextRequest) {
               reservedQuantity: course.reservedQuantity || 0,
               deliveredQuantity: course.deliveredQuantity || 0,
               remainingQuantity: course.remainingQuantity || 0,
-              availableInStock: course.availableInStock || 0,
+              availableInStock: availableQuantity - (course.totalQuantity || 0),
               startDate: new Date(course.startDate || new Date()),
               endDate: course.endDate ? new Date(course.endDate) : null,
               status: course.status || 'CREATED',
@@ -429,26 +558,45 @@ export async function PUT(request: NextRequest) {
             }
           })
 
-          // Create doses if provided
-          if (course.doses && course.doses.length > 0) {
-            await prisma.treatmentDose.createMany({
-              data: course.doses.map((dose: any, index: number) => ({
-                courseId: treatmentCourse.id,
-                doseNumber: dose.doseNumber || (index + 1),
-                scheduledDate: new Date(dose.scheduledAt || new Date()),
-                scheduledTime: dose.scheduledTime || '',
-                quantity: dose.quantity || 0,
-                status: dose.status || 'SCHEDULED',
-                takenAt: dose.takenAt || null,
-                takenDate: dose.takenDate ? new Date(dose.takenDate) : null,
-                isTaken: dose.isTaken || false,
-                isOnTime: dose.isOnTime || false,
-                notes: dose.notes || '',
-                sideEffects: dose.sideEffects || '',
-                takenBy: dose.takenBy || null
-              }))
-            })
-          }
+          // Update hospital treatment inventory - FIXED: Use totalQuantity instead of reservedQuantity
+          await tx.hospitalTreatment.update({
+            where: { id: course.hospitalTreatmentId },
+            data: {
+              reservedQuantity: {
+                increment: course.totalQuantity || 0  // Use totalQuantity for reservation
+              },
+              deliveredQuantity: {
+                increment: course.deliveredQuantity || 0
+              }
+            }
+          })
+
+          console.log(`✅ Updated inventory for ${course.courseName}:`)
+          console.log(`   - Reserved: +${course.totalQuantity}`)
+          console.log(`   - Delivered: +${course.deliveredQuantity}`)
+
+          return treatmentCourse
+        })
+
+        // Create doses if provided
+        if (course.doses && course.doses.length > 0) {
+          await prisma.treatmentDose.createMany({
+            data: course.doses.map((dose: any, index: number) => ({
+              courseId: result.id,
+              doseNumber: dose.doseNumber || (index + 1),
+              scheduledDate: new Date(dose.scheduledDate || dose.scheduledAt || new Date()),
+              scheduledTime: dose.scheduledTime || '',
+              quantity: dose.quantity || 0,
+              status: dose.status || 'SCHEDULED',
+              takenAt: dose.takenAt || null,
+              takenDate: dose.takenDate ? new Date(dose.takenDate) : null,
+              isTaken: dose.isTaken || false,
+              isOnTime: dose.isOnTime || false,
+              notes: dose.notes || '',
+              sideEffects: dose.sideEffects || '',
+              takenBy: dose.takenBy || null
+            }))
+          })
         }
       }
     }

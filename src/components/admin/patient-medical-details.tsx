@@ -252,7 +252,8 @@ export default function PatientMedicalDetails({ patientId }: PatientMedicalDetai
       return date.toLocaleDateString('ar-SA', {
         year: 'numeric',
         month: 'long',
-        day: 'numeric'
+        day: 'numeric',
+        calendar: 'gregory'
       })
     } catch (error) {
       console.error('Date formatting error:', error)

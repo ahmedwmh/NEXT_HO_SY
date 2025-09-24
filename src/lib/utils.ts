@@ -6,27 +6,30 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function formatDate(date: Date | string) {
-  return new Intl.DateTimeFormat('en-US', {
+  return new Intl.DateTimeFormat('ar-SA', {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
+    calendar: 'gregory'
   }).format(new Date(date))
 }
 
 export function formatDateTime(date: Date | string) {
-  return new Intl.DateTimeFormat('en-US', {
+  return new Intl.DateTimeFormat('ar-SA', {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
+    calendar: 'gregory'
   }).format(new Date(date))
 }
 
 export function formatTime(date: Date | string) {
-  return new Intl.DateTimeFormat('en-US', {
+  return new Intl.DateTimeFormat('ar-SA', {
     hour: '2-digit',
     minute: '2-digit',
+    calendar: 'gregory'
   }).format(new Date(date))
 }
 

@@ -355,7 +355,7 @@ export function PatientTests({ patientId }: PatientTestsProps) {
                       <div className="space-y-2 text-sm text-gray-600 mb-4">
                         <div className="flex items-center space-x-2 rtl:space-x-reverse">
                           <Calendar className="h-4 w-4" />
-                          <span>{new Date(test.date).toLocaleDateString('ar-IQ')}</span>
+                          <span>{new Date(test.date).toLocaleDateString('ar-SA', { calendar: 'gregory' })}</span>
                         </div>
                         <div className="flex items-center space-x-2 rtl:space-x-reverse">
                           <User className="h-4 w-4" />

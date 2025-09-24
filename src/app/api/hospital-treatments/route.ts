@@ -10,7 +10,12 @@ export async function GET(request: NextRequest) {
     const category = searchParams.get('category')
     const isActive = searchParams.get('isActive')
 
-    const where: any = {}
+    const where: any = {
+      // Only show treatments that have quantity and expiry date
+      quantity: { gt: 0 },
+      expiredate: { not: null },
+      isActive: true
+    }
     
     if (hospitalId) {
       where.hospitalId = hospitalId
@@ -35,7 +40,7 @@ export async function GET(request: NextRequest) {
           }
         },
         orderBy: {
-          createdAt: 'desc'
+          name: 'asc' // Sort by name to group duplicates together
         },
         skip: (page - 1) * limit,
         take: limit
@@ -43,14 +48,31 @@ export async function GET(request: NextRequest) {
       prisma.hospitalTreatment.count({ where })
     ])
 
+    // Add calculated available quantity to each treatment
+    const treatmentsWithAvailability = treatments.map(treatment => ({
+      ...treatment,
+      reservedQuantity: treatment.reservedQuantity || 0,
+      deliveredQuantity: treatment.deliveredQuantity || 0,
+      availableQuantity: (treatment.quantity || 0) - (treatment.reservedQuantity || 0) - (treatment.deliveredQuantity || 0)
+    }))
+
+    // Remove duplicates based on name and hospital
+    const uniqueTreatments = treatmentsWithAvailability.reduce((acc, treatment) => {
+      const key = `${treatment.name}-${treatment.hospitalId}`
+      if (!acc.find(t => `${t.name}-${t.hospitalId}` === key)) {
+        acc.push(treatment)
+      }
+      return acc
+    }, [] as typeof treatmentsWithAvailability)
+
     return NextResponse.json({
       success: true,
-      data: treatments,
+      data: uniqueTreatments,
       pagination: {
         page,
         limit,
-        total,
-        pages: Math.ceil(total / limit)
+        total: uniqueTreatments.length,
+        pages: Math.ceil(uniqueTreatments.length / limit)
       }
     })
   } catch (error) {

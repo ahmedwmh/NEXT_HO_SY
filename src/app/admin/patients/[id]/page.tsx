@@ -202,13 +202,127 @@ export default function SimplePatientPage() {
   }
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
+    if (!dateString) return 'غير محدد'
+    try {
+      const date = new Date(dateString)
+      if (isNaN(date.getTime())) return 'تاريخ غير صحيح'
+      return date.toLocaleDateString('ar-SA', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        calendar: 'gregory'
+      })
+    } catch (error) {
+      return 'تاريخ غير صحيح'
+    }
+  }
+
+  const formatDateOnly = (dateString: string) => {
+    if (!dateString) return 'غير محدد'
+    try {
+      const date = new Date(dateString)
+      if (isNaN(date.getTime())) return 'تاريخ غير صحيح'
+      return date.toLocaleDateString('ar-SA', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        calendar: 'gregory'
+      })
+    } catch (error) {
+      return 'تاريخ غير صحيح'
+    }
+  }
+
+  const formatDateTime = (dateString: string) => {
+    if (!dateString) return 'غير محدد'
+    try {
+      const date = new Date(dateString)
+      if (isNaN(date.getTime())) return 'تاريخ غير صحيح'
+      return date.toLocaleDateString('ar-SA', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        calendar: 'gregory'
+      })
+    } catch (error) {
+      return 'تاريخ غير صحيح'
+    }
+  }
+
+  const formatTime = (dateString: string) => {
+    if (!dateString) return 'غير محدد'
+    try {
+      const date = new Date(dateString)
+      if (isNaN(date.getTime())) return 'وقت غير صحيح'
+      return date.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    } catch (error) {
+      return 'وقت غير صحيح'
+    }
+  }
+
+  const formatDateRange = (startDate: string, endDate: string) => {
+    if (!startDate && !endDate) return 'غير محدد'
+    if (!startDate) return `حتى ${formatDateOnly(endDate)}`
+    if (!endDate) return `من ${formatDateOnly(startDate)}`
+    return `${formatDateOnly(startDate)} - ${formatDateOnly(endDate)}`
+  }
+
+  const formatAge = (dateOfBirth: string) => {
+    if (!dateOfBirth) return 'غير محدد'
+    try {
+      const birthDate = new Date(dateOfBirth)
+      const today = new Date()
+      let age = today.getFullYear() - birthDate.getFullYear()
+      const monthDiff = today.getMonth() - birthDate.getMonth()
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+        age--
+      }
+      return `${age} سنة`
+    } catch (error) {
+      return 'غير محدد'
+    }
+  }
+
+  const formatPhoneNumber = (phone: string) => {
+    if (!phone) return 'غير محدد'
+    // Format phone number for better readability
+    const cleaned = phone.replace(/\D/g, '')
+    if (cleaned.length === 11 && cleaned.startsWith('07')) {
+      return `+964 ${cleaned.slice(1, 4)} ${cleaned.slice(4, 7)} ${cleaned.slice(7)}`
+    }
+    return phone
+  }
+
+  const formatAddress = (address: string) => {
+    if (!address) return 'غير محدد'
+    return address.length > 50 ? `${address.substring(0, 50)}...` : address
+  }
+
+  const formatBloodType = (bloodType: string) => {
+    if (!bloodType) return 'غير محدد'
+    return bloodType
+  }
+
+  const formatAllergies = (allergies: string) => {
+    if (!allergies) return 'لا توجد'
+    return allergies.length > 100 ? `${allergies.substring(0, 100)}...` : allergies
+  }
+
+  const formatMedicalHistory = (medicalHistory: string) => {
+    if (!medicalHistory) return 'لا توجد'
+    return medicalHistory.length > 150 ? `${medicalHistory.substring(0, 150)}...` : medicalHistory
+  }
+
+  const formatNotes = (notes: string) => {
+    if (!notes) return 'لا توجد'
+    return notes.length > 200 ? `${notes.substring(0, 200)}...` : notes
   }
 
   const handleEditVisit = (visitId: string) => {
@@ -418,7 +532,7 @@ export default function SimplePatientPage() {
                                 </Badge>
                               </div>
                               <p className="text-sm text-gray-600 mb-1">
-                                {formatDate(visit.scheduledAt)}
+                                {formatDateTime(visit.scheduledAt)}
                               </p>
                               {visit.symptoms && (
                                 <p className="text-sm text-gray-600">
@@ -490,6 +604,9 @@ export default function SimplePatientPage() {
                                           {test.status && (
                                             <div className="text-gray-600">الحالة: {test.status}</div>
                                           )}
+                                          {(test as any).scheduledAt && (
+                                            <div className="text-gray-600">التاريخ: {formatDateOnly((test as any).scheduledAt)}</div>
+                                          )}
                                         </div>
                                       ))}
                                     </div>
@@ -515,6 +632,9 @@ export default function SimplePatientPage() {
                                           )}
                                           {(disease as any).status && (
                                             <div className="text-gray-600">الحالة: {(disease as any).status}</div>
+                                          )}
+                                          {(disease as any).diagnosedAt && (
+                                            <div className="text-gray-600">التاريخ: {formatDateOnly((disease as any).diagnosedAt)}</div>
                                           )}
                                         </div>
                                       ))}
@@ -611,12 +731,26 @@ export default function SimplePatientPage() {
                                           {course.description && (
                                             <div className="text-gray-600">الوصف: {course.description}</div>
                                           )}
-                                          {course.totalQuantity && (
-                                            <div className="text-gray-600">الكمية الإجمالية: {course.totalQuantity}</div>
-                                          )}
+                                          <div className="grid grid-cols-2 gap-2 mt-2">
+                                            {course.totalQuantity && (
+                                              <div className="text-gray-600">الكمية الإجمالية: {course.totalQuantity}</div>
+                                            )}
+                                            {course.reservedQuantity && (
+                                              <div className="text-blue-600">المحجوزة: {course.reservedQuantity}</div>
+                                            )}
+                                            {course.deliveredQuantity && (
+                                              <div className="text-green-600">المسلمة: {course.deliveredQuantity}</div>
+                                            )}
+                                            {course.remainingQuantity && (
+                                              <div className="text-orange-600">المتبقية: {course.remainingQuantity}</div>
+                                            )}
+                                          </div>
                                           {course.status && (
-                                            <div className="text-gray-600">الحالة: {course.status}</div>
+                                            <div className="text-gray-600 mt-1">الحالة: {course.status}</div>
                                           )}
+                                          <div className="text-gray-600">
+                                            {formatDateRange(course.startDate, course.endDate)}
+                                          </div>
                                         </div>
                                       ))}
                                     </div>
@@ -691,7 +825,7 @@ export default function SimplePatientPage() {
                               </Badge>
                             </div>
                             <p className="text-sm text-gray-600 mb-1">
-                              {formatDate(visit.scheduledAt)}
+                              {formatDateTime(visit.scheduledAt)}
                             </p>
                             {visit.symptoms && (
                               <p className="text-sm text-gray-600">
@@ -699,7 +833,7 @@ export default function SimplePatientPage() {
                               </p>
                             )}
                             <p className="text-xs text-gray-500">
-                              آخر تحديث: {formatDate(visit.scheduledAt)}
+                              آخر تحديث: {formatDateTime(visit.scheduledAt)}
                             </p>
                           </div>
                           <div className="flex space-x-2">

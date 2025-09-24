@@ -320,7 +320,7 @@ export default function ComprehensiveVisitSystem({
 
   // Load existing visit data
   useEffect(() => {
-    if (existingVisit) {
+    if (existingVisit && !isLoadingVisit) {
       console.log('🏥 Hospital ID:', existingVisit.hospitalId)
       console.log('👨‍⚕️ Doctor ID:', existingVisit.doctorId)
       console.log('🏙️ City ID:', existingVisit.cityId)
@@ -459,13 +459,18 @@ export default function ComprehensiveVisitSystem({
       setVisitData(formattedVisitData)
       setCurrentStep(existingVisit.currentStep || 1)
       
-      // Determine saved steps based on loaded data
-      const loadedSavedSteps = new Set<number>()
-      
-      // Step 1: Basic info (always saved if visit exists)
-      if (formattedVisitData.scheduledAt || formattedVisitData.doctorId || formattedVisitData.hospitalId) {
-        loadedSavedSteps.add(1)
-      }
+    // Determine saved steps based on loaded data
+    const loadedSavedSteps = new Set<number>()
+    
+    // Step 1: Basic info (always saved if visit exists)
+    if (formattedVisitData.scheduledAt || formattedVisitData.doctorId || formattedVisitData.hospitalId) {
+      loadedSavedSteps.add(1)
+    }
+    
+    // Always mark step 1 as saved if we're editing an existing visit
+    if (visitId) {
+      loadedSavedSteps.add(1)
+    }
       
       // Step 2: Tests - only if there are actual tests with data
       if (formattedVisitData.tests && formattedVisitData.tests.length > 0) {
@@ -511,22 +516,40 @@ export default function ComprehensiveVisitSystem({
       console.log('🔍 Detected saved steps from loaded data:', Array.from(loadedSavedSteps))
       setSavedSteps(loadedSavedSteps)
       
-           console.log('✅ ===== VISIT DATA LOADED SUCCESSFULLY =====')
-           console.log('📊 Final visit data state:', formattedVisitData)
-           console.log('📝 Current step set to:', existingVisit.currentStep || 1)
-           console.log('🧪 Tests loaded:', formattedVisitData.tests.length, 'items')
-           console.log('🧪 Tests details:', JSON.stringify(formattedVisitData.tests, null, 2))
-           console.log('🦠 Diseases loaded:', formattedVisitData.diseases.length, 'items')
-           console.log('🦠 Diseases details:', JSON.stringify(formattedVisitData.diseases, null, 2))
-           console.log('💊 Treatment Courses loaded:', formattedVisitData.treatmentCourses?.length || 0, 'items')
-           console.log('💊 Treatment Courses details:', JSON.stringify(formattedVisitData.treatmentCourses, null, 2))
-           console.log('🏥 Operations loaded:', formattedVisitData.operations.length, 'items')
-           console.log('💉 Medications loaded:', formattedVisitData.medications.length, 'items')
-           
-           // Show success toast
-           toast.success('تم تحميل بيانات الزيارة بنجاح')
+      console.log('✅ ===== VISIT DATA LOADED SUCCESSFULLY =====')
+      console.log('📊 Final visit data state:', formattedVisitData)
+      console.log('📝 Current step set to:', existingVisit.currentStep || 1)
+      console.log('🧪 Tests loaded:', formattedVisitData.tests.length, 'items')
+      console.log('🧪 Tests details:', JSON.stringify(formattedVisitData.tests, null, 2))
+      console.log('🦠 Diseases loaded:', formattedVisitData.diseases.length, 'items')
+      console.log('🦠 Diseases details:', JSON.stringify(formattedVisitData.diseases, null, 2))
+      console.log('💊 Treatment Courses loaded:', formattedVisitData.treatmentCourses?.length || 0, 'items')
+      console.log('💊 Treatment Courses details:', JSON.stringify(formattedVisitData.treatmentCourses, null, 2))
+      console.log('🏥 Operations loaded:', formattedVisitData.operations.length, 'items')
+      console.log('💉 Medications loaded:', formattedVisitData.medications.length, 'items')
+      
+      // Show success toast
+      toast.success('تم تحميل بيانات الزيارة بنجاح')
+      
+      // Force re-render to ensure UI updates
+      setTimeout(() => {
+        setVisitData({ ...formattedVisitData })
+        setSavedSteps(loadedSavedSteps)
+        setCurrentStep(existingVisit.currentStep || 1)
+        
+        // Log final state for debugging
+        console.log('🔄 Final state after re-render:', {
+          visitData: formattedVisitData,
+          savedSteps: Array.from(loadedSavedSteps),
+          currentStep: existingVisit.currentStep || 1
+        })
+      }, 100)
+    } else if (visitId && !isLoadingVisit && !existingVisit) {
+      // Handle case where visit ID is provided but visit not found
+      console.error('❌ Visit not found for ID:', visitId)
+      toast.error('الزيارة غير موجودة')
     }
-  }, [existingVisit])
+  }, [existingVisit, isLoadingVisit])
 
   // Fetch treatments when hospital changes
   useEffect(() => {
@@ -1208,6 +1231,39 @@ export default function ComprehensiveVisitSystem({
       console.log('✅ Treatment delivered successfully')
     } else {
       console.error('❌ Treatment must be reserved first')
+    }
+  }
+
+  const unreserveTreatment = (courseIndex: number) => {
+    const newTreatmentCourses = [...visitData.treatmentCourses]
+    const course = newTreatmentCourses[courseIndex]
+    
+    if (course.isReserved) {
+      course.isReserved = false
+      course.reservedQuantity = 0
+      course.status = 'CREATED'
+      
+      setVisitData({ ...visitData, treatmentCourses: newTreatmentCourses })
+      console.log('✅ Treatment reservation cancelled')
+    } else {
+      console.error('❌ Treatment is not reserved')
+    }
+  }
+
+  const undeliverTreatment = (courseIndex: number) => {
+    const newTreatmentCourses = [...visitData.treatmentCourses]
+    const course = newTreatmentCourses[courseIndex]
+    
+    if (course.isDelivered) {
+      course.isDelivered = false
+      course.deliveredQuantity = 0
+      course.remainingQuantity = course.totalQuantity
+      course.status = 'RESERVED'
+      
+      setVisitData({ ...visitData, treatmentCourses: newTreatmentCourses })
+      console.log('✅ Treatment delivery cancelled - back to reserved')
+    } else {
+      console.error('❌ Treatment is not delivered')
     }
   }
 
@@ -1944,7 +2000,7 @@ export default function ComprehensiveVisitSystem({
                               <div>المحجوز: {treatment.reservedQuantity || 0}</div>
                               {treatment.expiredate && (
                                 <div>
-                                  الانتهاء: {new Date(treatment.expiredate).toLocaleDateString('ar-EG-u-ca-gregory', { year: 'numeric', month: 'long', day: 'numeric' })}
+                                  الانتهاء: {new Date(treatment.expiredate).toLocaleDateString('ar-SA', { year: 'numeric', month: 'long', day: 'numeric', calendar: 'gregory' })}
                                 </div>
                               )}
                             </div>
@@ -2100,24 +2156,46 @@ export default function ComprehensiveVisitSystem({
                         <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                           <h5 className="font-semibold text-blue-800 mb-3">إدارة الحجز والتسليم</h5>
                           <div className="flex flex-wrap gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => reserveTreatment(courseIndex)}
-                              disabled={course.isReserved || course.availableInStock < course.totalQuantity}
-                              className="text-blue-600 hover:text-blue-700"
-                            >
-                              {course.isReserved ? '✓ محجوز' : 'حجز العلاج'}
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => deliverTreatment(courseIndex)}
-                              disabled={!course.isReserved || course.isDelivered}
-                              className="text-green-600 hover:text-green-700"
-                            >
-                              {course.isDelivered ? '✓ مسلم' : 'تسليم العلاج'}
-                            </Button>
+                            {!course.isReserved ? (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => reserveTreatment(courseIndex)}
+                                disabled={course.availableInStock < course.totalQuantity}
+                                className="text-blue-600 hover:text-blue-700"
+                              >
+                                حجز العلاج
+                              </Button>
+                            ) : (
+                              <Button
+                                variant="default"
+                                size="sm"
+                                onClick={() => unreserveTreatment(courseIndex)}
+                                className="text-blue-600 hover:text-blue-700"
+                              >
+                                ✓ محجوز - إلغاء الحجز
+                              </Button>
+                            )}
+                            
+                            {course.isReserved && !course.isDelivered ? (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => deliverTreatment(courseIndex)}
+                                className="text-green-600 hover:text-green-700"
+                              >
+                                تسليم العلاج
+                              </Button>
+                            ) : course.isDelivered ? (
+                              <Button
+                                variant="default"
+                                size="sm"
+                                onClick={() => undeliverTreatment(courseIndex)}
+                                className="text-green-600 hover:text-green-700"
+                              >
+                                ✓ مسلم - إرجاع إلى محجوز
+                              </Button>
+                            ) : null}
                             <div className="flex items-center gap-2 text-sm">
                               <span className={`px-2 py-1 rounded ${course.isReserved ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
                                 {course.isReserved ? 'محجوز' : 'غير محجوز'}

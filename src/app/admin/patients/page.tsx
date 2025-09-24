@@ -48,6 +48,101 @@ export default function PatientsPage() {
   // UI state
   const [showAddForm, setShowAddForm] = useState(false)
   const [editingPatient, setEditingPatient] = useState<Patient | null>(null)
+
+  // Populate form when editing patient
+  useEffect(() => {
+    if (editingPatient && showAddForm) {
+      console.log('🔄 useEffect: Populating form for editing patient')
+      console.log('🏥 Patient hospital:', editingPatient.hospital)
+      console.log('🏥 Available hospitals:', hospitals)
+      console.log('👨‍⚕️ Available doctors:', doctors)
+      
+      // Use a timeout to ensure the form is ready
+      const timeoutId = setTimeout(() => {
+        form.populateForm(editingPatient, hospitals, doctors)
+      }, 50)
+      
+      return () => clearTimeout(timeoutId)
+    }
+  }, [editingPatient, showAddForm, hospitals, doctors])
+
+  // Reset form when closing
+  useEffect(() => {
+    if (!showAddForm) {
+      form.resetForm()
+      setEditingPatient(null)
+    }
+  }, [showAddForm])
+
+  // Debug effect to monitor form state
+  useEffect(() => {
+    if (editingPatient) {
+      console.log('🔍 Form state after population:', {
+        formData: form.formData,
+        selectedCityId: form.selectedCityId,
+        selectedHospitalId: form.selectedHospitalId,
+        filteredHospitals: form.filteredHospitals.length,
+        filteredDoctors: form.filteredDoctors.length
+      })
+    }
+  }, [form.formData, form.selectedCityId, form.selectedHospitalId, form.filteredHospitals, form.filteredDoctors, editingPatient])
+
+  // Force re-render when form data changes
+  const [formKey, setFormKey] = useState(0)
+  useEffect(() => {
+    if (editingPatient && showAddForm) {
+      setFormKey(prev => prev + 1)
+    }
+  }, [editingPatient, showAddForm])
+
+  // Handle form submission with better error handling
+  const handleFormSubmit = async (formData: any) => {
+    try {
+      console.log('📝 Submitting form data:', formData)
+      
+      if (editingPatient) {
+        await updatePatient(editingPatient.id, formData)
+        console.log('✅ Patient updated successfully')
+      } else {
+        await createPatient(formData)
+        console.log('✅ Patient created successfully')
+      }
+    } catch (error) {
+      console.error('❌ Error submitting form:', error)
+      throw error
+    }
+  }
+
+  // Enhanced form validation
+  const validateForm = (data: any) => {
+    const errors: string[] = []
+    
+    if (!data.firstName?.trim()) errors.push('الاسم الأول مطلوب')
+    if (!data.lastName?.trim()) errors.push('الاسم الأخير مطلوب')
+    if (!data.dateOfBirth) errors.push('تاريخ الميلاد مطلوب')
+    if (!data.gender) errors.push('الجنس مطلوب')
+    if (!data.phone?.trim()) errors.push('رقم الهاتف مطلوب')
+    if (!data.address?.trim()) errors.push('العنوان مطلوب')
+    if (!data.emergencyContact?.trim()) errors.push('رقم الطوارئ مطلوب')
+    if (!data.cityId) errors.push('المدينة مطلوبة')
+    if (!data.hospitalId) errors.push('المستشفى مطلوب')
+    
+    return errors
+  }
+
+  // Enhanced error handling
+  const handleError = (error: any) => {
+    console.error('❌ Form error:', error)
+    
+    if (error.message?.includes('رقم الهوية الوطنية')) {
+      setIdNumberError(error.message)
+    } else {
+      setIdNumberError('')
+    }
+    
+    // Show user-friendly error message
+    alert(error.message || 'حدث خطأ أثناء حفظ البيانات')
+  }
   const [deletingPatient, setDeletingPatient] = useState<Patient | null>(null)
   const [patientImages, setPatientImages] = useState<Array<{
     id?: string
@@ -167,8 +262,11 @@ export default function PatientsPage() {
   }
 
   const handleEdit = (patient: Patient) => {
+    console.log('🔄 handleEdit called with patient:', patient)
+    console.log('🏥 Available hospitals:', hospitals.length)
+    console.log('👨‍⚕️ Available doctors:', doctors.length)
+    
     setEditingPatient(patient)
-    form.populateForm(patient)
     setIdNumberError('')
     setShowAddForm(true)
   }
@@ -187,32 +285,36 @@ export default function PatientsPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    // Check if there's an ID number error
-    if (idNumberError) {
-      alert('يرجى إصلاح خطأ رقم الهوية الوطنية قبل المتابعة')
-      return
-    }
-
-    // Final check for ID number uniqueness before submission
-    if (form.formData.idNumber && form.formData.idNumber.trim()) {
-      const isUnique = await checkIdNumberUniqueness(form.formData.idNumber)
-      if (!isUnique) {
-        alert('رقم الهوية الوطنية مستخدم بالفعل')
+    try {
+      // Check if there's an ID number error
+      if (idNumberError) {
+        alert('يرجى إصلاح خطأ رقم الهوية الوطنية قبل المتابعة')
         return
       }
-    }
-    
-    const patientData = form.preparePatientData(form.formData)
 
-    if (editingPatient) {
-      await updatePatient(editingPatient.id, patientData)
-    } else {
-      // Include selected tests when creating new patient
-      const patientDataWithTests = {
-        ...patientData,
-        selectedTests: selectedTests
+      // Final check for ID number uniqueness before submission
+      if (form.formData.idNumber && form.formData.idNumber.trim()) {
+        const isUnique = await checkIdNumberUniqueness(form.formData.idNumber)
+        if (!isUnique) {
+          alert('رقم الهوية الوطنية مستخدم بالفعل')
+          return
+        }
       }
-      await createPatient(patientDataWithTests)
+      
+      const patientData = form.preparePatientData(form.formData)
+
+      if (editingPatient) {
+        await updatePatient(editingPatient.id, patientData)
+      } else {
+        // Include selected tests when creating new patient
+        const patientDataWithTests = {
+          ...patientData,
+          selectedTests: selectedTests
+        }
+        await createPatient(patientDataWithTests)
+      }
+    } catch (error) {
+      handleError(error)
     }
   }
 
@@ -237,6 +339,25 @@ export default function PatientsPage() {
       ),
       sortable: true,
       searchable: true
+    },
+    {
+      key: 'dateOfBirth' as keyof Patient,
+      label: 'تاريخ الميلاد',
+      render: (value: string) => {
+        if (!value) return '-'
+        try {
+          const date = new Date(value)
+          if (isNaN(date.getTime())) return 'تاريخ غير صحيح'
+          return date.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit'
+          })
+        } catch (error) {
+          return 'تاريخ غير صحيح'
+        }
+      },
+      sortable: true
     },
     {
       key: 'gender' as keyof Patient,
@@ -468,15 +589,6 @@ export default function PatientsPage() {
                 placeholder={dataLoading ? "جاري التحميل..." : (form.selectedCityId ? "اختر المستشفى" : "اختر المدينة أولاً")}
                 options={form.filteredHospitals.map(h => ({ value: h.id, label: h.name }))}
                 disabled={!form.selectedCityId || dataLoading}
-              />
-            </FormField>
-            <FormField label="الطبيب" required>
-              <SelectInput
-                value={form.formData.doctorId}
-                onChange={(value) => form.setFormData({ ...form.formData, doctorId: value })}
-                placeholder={dataLoading ? "جاري التحميل..." : (form.selectedHospitalId ? "اختر الطبيب" : "اختر المستشفى أولاً")}
-                options={form.filteredDoctors.map(d => ({ value: d.id, label: `${d.firstName} ${d.lastName} - ${d.specialization}` }))}
-                disabled={!form.selectedHospitalId || dataLoading}
               />
             </FormField>
           </FormGrid>

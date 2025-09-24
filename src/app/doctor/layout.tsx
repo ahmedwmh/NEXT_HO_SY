@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { DoctorProvider } from '@/contexts/doctor-context'
 import { 
   LayoutDashboard, 
   Users, 
@@ -37,8 +38,12 @@ export default function DoctorLayout({
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const pathname = usePathname()
 
+  // TODO: Get doctorId from authentication context
+  const doctorId = 'cmfnt092h006l7szhg1lkb3ci' // This should come from auth
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <DoctorProvider doctorId={doctorId}>
+      <div className="min-h-screen bg-gray-50">
       {/* Sidebar */}
       <div className={`fixed inset-y-0 right-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out ${
         sidebarOpen ? 'translate-x-0' : 'translate-x-full'
@@ -129,6 +134,7 @@ export default function DoctorLayout({
           onClick={() => setSidebarOpen(false)}
         />
       )}
-    </div>
+      </div>
+    </DoctorProvider>
   )
 }

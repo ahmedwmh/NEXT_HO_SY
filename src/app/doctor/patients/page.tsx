@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { UniversalTable } from '@/components/ui/universal-table'
+import { useDoctorDataFilter } from '@/hooks/use-doctor-data'
 import { Plus, Search, Edit, Eye, Phone, Mail, MapPin, Calendar } from 'lucide-react'
 
 interface Patient {
@@ -31,24 +32,31 @@ interface Patient {
 }
 
 export default function DoctorPatientsPage() {
+  const { hospitalId, filteredData, loading, error } = useDoctorDataFilter()
   const [patients, setPatients] = useState<Patient[]>([])
-  const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
 
   useEffect(() => {
-    fetchPatients()
-  }, [])
+    if (filteredData.patients) {
+      // Ensure patients have the required hospital and city properties
+      const patientsWithRelations = filteredData.patients.map((patient: any) => ({
+        ...patient,
+        hospital: patient.hospital || { id: '', name: 'غير محدد' },
+        city: patient.city || { id: '', name: 'غير محدد' }
+      }))
+      setPatients(patientsWithRelations)
+    }
+  }, [filteredData.patients])
 
   const fetchPatients = async () => {
+    if (!hospitalId) return
+    
     try {
-      // In a real app, this would filter by doctor's hospital
-      const response = await fetch('/api/patients')
+      const response = await fetch(`/api/patients?hospitalId=${hospitalId}`)
       const data = await response.json()
       setPatients(data.data || data || [])
     } catch (error) {
       console.error('خطأ في جلب المرضى:', error)
-    } finally {
-      setLoading(false)
     }
   }
 

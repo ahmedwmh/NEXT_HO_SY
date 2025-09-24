@@ -246,13 +246,13 @@ export function PatientPrescriptions({ patientId }: PatientPrescriptionsProps) {
                           <div className="flex items-center space-x-2 rtl:space-x-reverse">
                             <Calendar className="h-4 w-4 text-gray-400" />
                             <span className="text-gray-600">تاريخ البداية:</span>
-                            <span className="font-medium">{new Date(prescription.startDate).toLocaleDateString('ar-IQ')}</span>
+                            <span className="font-medium">{new Date(prescription.startDate).toLocaleDateString('ar-SA', { calendar: 'gregory' })}</span>
                           </div>
                           {prescription.endDate && (
                             <div className="flex items-center space-x-2 rtl:space-x-reverse">
                               <Calendar className="h-4 w-4 text-gray-400" />
                               <span className="text-gray-600">تاريخ النهاية:</span>
-                              <span className="font-medium">{new Date(prescription.endDate).toLocaleDateString('ar-IQ')}</span>
+                              <span className="font-medium">{new Date(prescription.endDate).toLocaleDateString('ar-SA', { calendar: 'gregory' })}</span>
                             </div>
                           )}
                           <div className="flex items-center space-x-2 rtl:space-x-reverse">

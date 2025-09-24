@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
+import { getAuthenticatedUser, canAccessHospital } from '@/lib/auth-middleware'
 
 export async function GET(request: NextRequest) {
   try {
+    const user = await getAuthenticatedUser(request)
+    if (!user) {
+      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 })
+    }
+
     const { searchParams } = new URL(request.url)
     const idNumber = searchParams.get('idNumber')
     const hospitalId = searchParams.get('hospitalId')
@@ -25,7 +31,18 @@ export async function GET(request: NextRequest) {
     
     // Filter by hospital if specified
     if (hospitalId) {
+      // Check if user can access this hospital
+      if (!canAccessHospital(user, hospitalId)) {
+        return NextResponse.json({ error: 'غير مصرح للوصول لهذا المستشفى' }, { status: 403 })
+      }
       whereClause.hospitalId = hospitalId
+    } else if (user.role !== 'ADMIN') {
+      // Non-admin users can only see patients from their hospital
+      if (user.hospitalId) {
+        whereClause.hospitalId = user.hospitalId
+      } else {
+        return NextResponse.json({ error: 'غير مصرح' }, { status: 403 })
+      }
     }
 
     const patients = await prisma.patient.findMany({
@@ -67,6 +84,11 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const user = await getAuthenticatedUser(request)
+    if (!user) {
+      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 })
+    }
+
     const {
       firstName,
       lastName,
@@ -98,6 +120,11 @@ export async function POST(request: NextRequest) {
         { error: 'جميع الحقول المطلوبة يجب ملؤها' },
         { status: 400 }
       )
+    }
+
+    // Check if user can access this hospital
+    if (!canAccessHospital(user, hospitalId)) {
+      return NextResponse.json({ error: 'غير مصرح للوصول لهذا المستشفى' }, { status: 403 })
     }
 
     // Check if ID number already exists (if provided)

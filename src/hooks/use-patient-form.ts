@@ -16,7 +16,6 @@ interface PatientFormData {
   idNumber: string
   cityId: string
   hospitalId: string
-  doctorId: string
   insuranceNumber: string
   maritalStatus: string
   occupation: string
@@ -39,7 +38,6 @@ const initialFormData: PatientFormData = {
   idNumber: '',
   cityId: '',
   hospitalId: '',
-  doctorId: '',
   insuranceNumber: '',
   maritalStatus: '',
   occupation: '',
@@ -62,7 +60,13 @@ export function usePatientForm() {
     setFilteredDoctors([])
   }, [])
 
-  const populateForm = useCallback((patient: Patient) => {
+  const populateForm = useCallback((patient: Patient, hospitals: Hospital[] = [], doctors: Doctor[] = []) => {
+    console.log('🏥 populateForm called with:', {
+      patient: patient,
+      hospitals: hospitals.length,
+      doctors: doctors.length
+    })
+    
     setFormData({
       firstName: patient.firstName,
       lastName: patient.lastName,
@@ -78,7 +82,6 @@ export function usePatientForm() {
       idNumber: patient.idNumber || '',
       cityId: patient.hospital?.city?.id || '',
       hospitalId: patient.hospitalId,
-      doctorId: '', // This would need to be determined based on your data structure
       insuranceNumber: patient.insuranceNumber || '',
       maritalStatus: patient.maritalStatus || '',
       occupation: patient.occupation || '',
@@ -87,6 +90,19 @@ export function usePatientForm() {
     })
     setSelectedCityId(patient.hospital?.city?.id || '')
     setSelectedHospitalId(patient.hospitalId)
+    
+    // Update filtered hospitals and doctors
+    if (patient.hospital?.city?.id && hospitals.length > 0) {
+      const cityHospitals = hospitals.filter(hospital => hospital.cityId === patient.hospital.city.id)
+      console.log('🏥 Filtered hospitals for city:', cityHospitals)
+      setFilteredHospitals(cityHospitals)
+    }
+    
+    if (patient.hospitalId && doctors.length > 0) {
+      const hospitalDoctors = doctors.filter(doctor => doctor.hospitalId === patient.hospitalId)
+      console.log('👨‍⚕️ Filtered doctors for hospital:', hospitalDoctors)
+      setFilteredDoctors(hospitalDoctors)
+    }
   }, [])
 
   const handleCityChange = useCallback(

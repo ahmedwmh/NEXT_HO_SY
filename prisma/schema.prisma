@@ -707,21 +707,26 @@ model HospitalTest {
 }
 
 model HospitalTreatment {
-  id          String   @id @default(cuid())
-  hospitalId  String
-  name        String
-  description String?
-  category    String?  // فئة العلاج (دوائي، فيزيائي، إلخ)
-  duration    String?  // مدة العلاج
-  cost        Decimal? // تكلفة العلاج
-  quantity    Int?     // الكمية المتاحة
-  expiredate  DateTime? // تاريخ انتهاء الصلاحية
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id               String   @id @default(cuid())
+  hospitalId       String
+  name             String
+  description      String?
+  category         String?  // فئة العلاج (دوائي، فيزيائي، إلخ)
+  duration         String?  // مدة العلاج
+  cost             Decimal? // تكلفة العلاج
+  quantity         Int?     // الكمية الإجمالية
+  reservedQuantity Int?     @default(0) // الكمية المحجوزة
+  deliveredQuantity Int?    @default(0) // الكمية المسلمة
+  expiredate       DateTime? // تاريخ انتهاء الصلاحية
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   // Relations
   hospital Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+
+  // Relations
+  treatmentCourses TreatmentCourse[] // الكورسات العلاجية
 
   @@index([hospitalId])
   @@index([name])
@@ -729,9 +734,6 @@ model HospitalTreatment {
   @@index([isActive])
   @@index([expiredate])
   @@map("hospital_treatments")
-  
-  // Relations
-  treatmentCourses TreatmentCourse[] // الكورسات العلاجية
 }
 
 model HospitalOperation {

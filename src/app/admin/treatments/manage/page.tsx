@@ -112,7 +112,7 @@ export default function TreatmentsManagementPage() {
       const response = await fetch(`/api/hospitals?cityId=${cityId}`)
       if (!response.ok) throw new Error('Failed to fetch hospitals')
       const data = await response.json()
-      setHospitals(data || [])
+      setHospitals(data.data || [])  // Fixed: Use data.data instead of data
     } catch (error) {
       console.error('Error fetching hospitals:', error)
       setHospitals([])
@@ -386,7 +386,7 @@ export default function TreatmentsManagementPage() {
                       } />
                     </SelectTrigger>
                     <SelectContent>
-                      {hospitals.map((hospital) => (
+                      {Array.isArray(hospitals) && hospitals.map((hospital) => (
                         <SelectItem key={hospital.id} value={hospital.id}>
                           {hospital.name} - {hospital.city.name}
                         </SelectItem>

@@ -226,10 +226,17 @@ export async function PUT(
       }
     }
 
+    // Extract hospital ID if it's in format "name-id"
+    let normalizedHospitalId = hospitalId
+    if (hospitalId && hospitalId.includes('-')) {
+      const parts = hospitalId.split('-')
+      normalizedHospitalId = parts[parts.length - 1]
+    }
+
     // Check if hospital exists
-    if (hospitalId) {
+    if (normalizedHospitalId) {
       const hospital = await prisma.hospital.findUnique({
-        where: { id: hospitalId }
+        where: { id: normalizedHospitalId }
       })
       if (!hospital) {
         return NextResponse.json(
@@ -261,7 +268,11 @@ export async function PUT(
       ...patientData,
       allergies: Array.isArray(patientData.allergies) 
         ? patientData.allergies.join(', ') 
-        : patientData.allergies
+        : patientData.allergies,
+      // Convert dateOfBirth to proper ISO format
+      dateOfBirth: patientData.dateOfBirth 
+        ? new Date(patientData.dateOfBirth).toISOString()
+        : undefined
     }
 
     const updatedPatient = await prisma.patient.update({
@@ -269,7 +280,7 @@ export async function PUT(
       data: {
         ...processedPatientData,
         cityId,
-        hospitalId
+        hospitalId: normalizedHospitalId
       },
       include: {
         city: {
