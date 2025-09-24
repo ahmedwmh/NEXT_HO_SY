@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'react-hot-toast'
+import VisitDetailsModal from './visit-details-modal'
 import { 
   Calendar, 
   User, 
@@ -25,10 +26,12 @@ import {
 } from 'lucide-react'
 
 interface ComprehensiveVisitSystemProps {
-  patientId: string
+  patientId?: string
   isOpen: boolean
   onClose: () => void
   visitId?: string
+  defaultHospitalId?: string
+  defaultCityId?: string
 }
 
 interface VisitData {
@@ -130,25 +133,46 @@ export default function ComprehensiveVisitSystem({
   patientId, 
   isOpen, 
   onClose, 
-  visitId 
+  visitId,
+  defaultHospitalId,
+  defaultCityId
 }: ComprehensiveVisitSystemProps) {
   const [currentStep, setCurrentStep] = useState(1)
   const [isLoading, setIsLoading] = useState(false)
   const [savedSteps, setSavedSteps] = useState<Set<number>>(new Set())
   const [isAddingItem, setIsAddingItem] = useState(false)
+  const [selectedPatientId, setSelectedPatientId] = useState<string>(patientId || '')
+  const [patientSearchTerm, setPatientSearchTerm] = useState('')
+  const [showVisitDetails, setShowVisitDetails] = useState(false)
+  const [createdVisitId, setCreatedVisitId] = useState<string | null>(null)
+  
+  // Fetch patients for selection with search
+  const { data: patients, isLoading: isLoadingPatients } = useQuery({
+    queryKey: ['patients', patientSearchTerm],
+    queryFn: async () => {
+      const params = new URLSearchParams()
+      if (patientSearchTerm) {
+        params.append('search', patientSearchTerm)
+      }
+      const response = await fetch(`/api/patients?${params.toString()}`)
+      const data = await response.json()
+      return data.data || []
+    },
+    enabled: !patientId // Only fetch if no patient is pre-selected
+  })
   
   // Treatment course management
   const [availableTreatments, setAvailableTreatments] = useState<any[]>([])
   const [loadingTreatments, setLoadingTreatments] = useState(false)
   const [treatmentAlerts, setTreatmentAlerts] = useState<{[key: string]: string}>({})
   const [visitData, setVisitData] = useState<VisitData>({
-    scheduledAt: '',
+    scheduledAt: new Date().toISOString().slice(0, 16),
     symptoms: '',
     notes: '',
     diagnosis: '',
     doctorId: '',
-    hospitalId: '',
-    cityId: '',
+    hospitalId: defaultHospitalId || '',
+    cityId: defaultCityId || '',
     tests: [],
     diseases: [],
     treatmentCourses: [],
@@ -158,59 +182,6 @@ export default function ComprehensiveVisitSystem({
 
   // Auto-fill patient data function
   const [isApplyingPatientData, setIsApplyingPatientData] = useState(false)
-
-  const applyPatientData = async () => {
-    if (!patientData) return
-    if (isApplyingPatientData) return
-    setIsApplyingPatientData(true)
-    try {
-    console.log('🔄 Applying patient data:', patientData)
-    
-    // Find the first available doctor for the hospital
-    let selectedDoctorId = ''
-    if (patientData.hospitalId && doctors) {
-      const hospitalDoctors = doctors.filter((doctor: any) => doctor.hospitalId === patientData.hospitalId)
-      if (hospitalDoctors.length > 0) {
-        selectedDoctorId = hospitalDoctors[0].id
-        console.log('👨‍⚕️ Auto-selected doctor:', hospitalDoctors[0].firstName, hospitalDoctors[0].lastName)
-      }
-    }
-    
-    setVisitData(prev => ({
-      ...prev,
-      cityId: patientData.hospital?.city?.id || '',
-      hospitalId: patientData.hospitalId || '',
-      doctorId: selectedDoctorId,
-      scheduledAt: new Date().toISOString().slice(0, 16) // Current date/time
-    }))
-
-    // Mark step 1 as saved since we have basic info
-    setSavedSteps(prev => new Set(Array.from(prev).concat([1])))
-    
-    // If patient has selected tests, add them to the visit
-    if (patientData.tests && patientData.tests.length > 0) {
-      const patientTests = patientData.tests.map((test: any) => ({
-        name: test.name,
-        description: test.description || '',
-        status: 'SCHEDULED'
-      }))
-      
-      setVisitData(prev => ({
-        ...prev,
-        tests: patientTests
-      }))
-      
-      // Mark step 2 as saved if we have tests
-      setSavedSteps(prev => new Set(Array.from(prev).concat([2])))
-      
-      console.log('✅ Patient selected tests applied:', patientTests.length)
-    }
-    
-    console.log('✅ Patient data applied successfully')
-    } finally {
-      setIsApplyingPatientData(false)
-    }
-  }
 
   // Fetch available treatments from hospital
   const fetchAvailableTreatments = async (hospitalId: string) => {
@@ -317,6 +288,14 @@ export default function ComprehensiveVisitSystem({
     },
     enabled: !!patientId && isOpen
   })
+
+
+  // Auto-apply patient data when patientId is provided
+  useEffect(() => {
+    if (patientId && patientData) {
+      applyPatientData()
+    }
+  }, [patientId, patientData])
 
   // Load existing visit data
   useEffect(() => {
@@ -583,6 +562,60 @@ export default function ComprehensiveVisitSystem({
     }
   })
 
+  // Apply patient data function
+  const applyPatientData = useCallback(async () => {
+    if (!patientData) return
+    if (isApplyingPatientData) return
+    setIsApplyingPatientData(true)
+    try {
+    console.log('🔄 Applying patient data:', patientData)
+    
+    // Find the first available doctor for the hospital
+    let selectedDoctorId = ''
+    if (patientData.hospitalId && doctors) {
+      const hospitalDoctors = doctors.filter((doctor: any) => doctor.hospitalId === patientData.hospitalId)
+      if (hospitalDoctors.length > 0) {
+        selectedDoctorId = hospitalDoctors[0].id
+        console.log('👨‍⚕️ Auto-selected doctor:', hospitalDoctors[0].firstName, hospitalDoctors[0].lastName)
+      }
+    }
+    
+    setVisitData(prev => ({
+      ...prev,
+      cityId: patientData.hospital?.city?.id || '',
+      hospitalId: patientData.hospitalId || '',
+      doctorId: selectedDoctorId,
+      scheduledAt: new Date().toISOString().slice(0, 16) // Current date/time
+    }))
+
+    // Mark step 1 as saved since we have basic info
+    setSavedSteps(prev => new Set(Array.from(prev).concat([1])))
+    
+    // If patient has selected tests, add them to the visit
+    if (patientData.tests && patientData.tests.length > 0) {
+      const patientTests = patientData.tests.map((test: any) => ({
+        name: test.name,
+        description: test.description || '',
+        status: 'SCHEDULED'
+      }))
+      
+      setVisitData(prev => ({
+        ...prev,
+        tests: patientTests
+      }))
+      
+      // Mark step 2 as saved if we have tests
+      setSavedSteps(prev => new Set(Array.from(prev).concat([2])))
+      
+      console.log('✅ Patient selected tests applied:', patientTests.length)
+    }
+    
+    console.log('✅ Patient data applied successfully')
+    } finally {
+      setIsApplyingPatientData(false)
+    }
+  }, [patientData, doctors, isApplyingPatientData])
+
   const { data: hospitals, isLoading: isLoadingHospitals } = useQuery({
     queryKey: ['hospitals'],
     queryFn: async () => {
@@ -782,7 +815,7 @@ export default function ComprehensiveVisitSystem({
             const requestBody = isComplete ? {
               // Complete save with all data
               id: visitId,
-              patientId,
+              patientId: selectedPatientId,
               scheduledAt: visitData.scheduledAt,
               symptoms: visitData.symptoms,
               notes: visitData.notes,
@@ -799,7 +832,7 @@ export default function ComprehensiveVisitSystem({
             } : {
               // Draft save with basic data including city/hospital/doctor
               ...(visitId && { id: visitId }),
-              patientId,
+              patientId: selectedPatientId,
               scheduledAt: visitData.scheduledAt,
               symptoms: visitData.symptoms,
               notes: visitData.notes,
@@ -880,7 +913,13 @@ export default function ComprehensiveVisitSystem({
       queryClient.invalidateQueries({ queryKey: ['visits', patientId] })
       const isComplete = variables
       toast.success(isComplete ? 'تم حفظ الزيارة بنجاح' : 'تم حفظ المسودة بنجاح')
-      if (isComplete) {
+      
+      if (isComplete && data?.id) {
+        // Show visit details modal after successful creation
+        setCreatedVisitId(data.id)
+        setShowVisitDetails(true)
+      } else if (!isComplete) {
+        // For drafts, just close the form
         onClose()
       }
     },
@@ -896,6 +935,10 @@ export default function ComprehensiveVisitSystem({
 
   const handleSave = (isComplete: boolean = false) => {
     // Basic validation
+    if (!selectedPatientId) {
+      toast.error('يرجى اختيار المريض')
+      return
+    }
     if (!visitData.scheduledAt || visitData.scheduledAt === '') {
       toast.error('يرجى تحديد تاريخ ووقت الزيارة')
       return
@@ -1157,6 +1200,26 @@ export default function ComprehensiveVisitSystem({
     const newTreatmentCourses = [...visitData.treatmentCourses]
     const course = newTreatmentCourses[courseIndex]
     
+    // Check if adding this dose would exceed reserved quantity
+    const totalDoseQuantity = course.doses.reduce((sum, dose) => sum + (dose.quantity || 0), 0)
+    const newDoseQuantity = 1 // Default quantity for new dose
+    const totalAfterAdd = totalDoseQuantity + newDoseQuantity
+    
+    if (totalAfterAdd > course.reservedQuantity) {
+      toast.error(`⚠️ إجمالي كمية الجرعات (${totalAfterAdd}) يتجاوز الكمية المحجوزة (${course.reservedQuantity})`, {
+        duration: 5000,
+        style: {
+          background: '#F59E0B',
+          color: '#fff',
+          fontSize: '16px',
+          padding: '16px 24px',
+          borderRadius: '8px',
+          boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)'
+        }
+      })
+      return
+    }
+    
     const newDose: TreatmentDoseData = {
       doseNumber: course.doses.length + 1,
       // جدولة الجرعة
@@ -1180,6 +1243,33 @@ export default function ComprehensiveVisitSystem({
 
   const updateDose = (courseIndex: number, doseIndex: number, field: keyof TreatmentDoseData, value: string | number) => {
     const newTreatmentCourses = [...visitData.treatmentCourses]
+    const course = newTreatmentCourses[courseIndex]
+    
+    // If updating quantity, check if total would exceed reserved quantity
+    if (field === 'quantity') {
+      const newQuantity = typeof value === 'number' ? value : parseInt(value.toString()) || 1
+      const otherDosesQuantity = course.doses.reduce((sum, dose, index) => {
+        if (index === doseIndex) return sum // Skip current dose
+        return sum + (dose.quantity || 0)
+      }, 0)
+      const totalAfterUpdate = otherDosesQuantity + newQuantity
+      
+      if (totalAfterUpdate > course.reservedQuantity) {
+        toast.error(`⚠️ إجمالي كمية الجرعات (${totalAfterUpdate}) يتجاوز الكمية المحجوزة (${course.reservedQuantity})`, {
+          duration: 5000,
+          style: {
+            background: '#F59E0B',
+            color: '#fff',
+            fontSize: '16px',
+            padding: '16px 24px',
+            borderRadius: '8px',
+            boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)'
+          }
+        })
+        return
+      }
+    }
+    
     newTreatmentCourses[courseIndex].doses[doseIndex] = {
       ...newTreatmentCourses[courseIndex].doses[doseIndex],
       [field]: value
@@ -1227,8 +1317,11 @@ export default function ComprehensiveVisitSystem({
       course.remainingQuantity = course.totalQuantity - course.deliveredQuantity
       course.status = 'DELIVERED'
       
+      // Update available stock when delivering (move from reserved to delivered)
+      course.availableInStock = course.availableInStock + course.reservedQuantity
+      
       setVisitData({ ...visitData, treatmentCourses: newTreatmentCourses })
-      console.log('✅ Treatment delivered successfully')
+      console.log('✅ Treatment delivered successfully - stock updated')
     } else {
       console.error('❌ Treatment must be reserved first')
     }
@@ -1243,8 +1336,11 @@ export default function ComprehensiveVisitSystem({
       course.reservedQuantity = 0
       course.status = 'CREATED'
       
+      // Update available stock when unreserving
+      course.availableInStock = course.availableInStock + course.totalQuantity
+      
       setVisitData({ ...visitData, treatmentCourses: newTreatmentCourses })
-      console.log('✅ Treatment reservation cancelled')
+      console.log('✅ Treatment reservation cancelled - stock updated')
     } else {
       console.error('❌ Treatment is not reserved')
     }
@@ -1260,8 +1356,11 @@ export default function ComprehensiveVisitSystem({
       course.remainingQuantity = course.totalQuantity
       course.status = 'RESERVED'
       
+      // Update available stock when undelivering (move from delivered back to reserved)
+      course.availableInStock = course.availableInStock + course.totalQuantity
+      
       setVisitData({ ...visitData, treatmentCourses: newTreatmentCourses })
-      console.log('✅ Treatment delivery cancelled - back to reserved')
+      console.log('✅ Treatment delivery cancelled - back to reserved, stock updated')
     } else {
       console.error('❌ Treatment is not delivered')
     }
@@ -1484,7 +1583,7 @@ export default function ComprehensiveVisitSystem({
                   <Calendar className="w-5 h-5 mr-2" />
                   معلومات الزيارة الأساسية
                 </div>
-                {patientData && !visitId && (
+                {patientData && !visitId && !patientId && (
                   <div className="flex flex-col items-end space-y-2">
                     <Button
                       type="button"
@@ -1515,6 +1614,53 @@ export default function ComprehensiveVisitSystem({
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Patient Selection - Only show if no patient is pre-selected */}
+              {!patientId && (
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="patientSearch">البحث عن المريض</Label>
+                    <Input
+                      id="patientSearch"
+                      type="text"
+                      placeholder="ابحث بالاسم أو رقم المريض..."
+                      value={patientSearchTerm}
+                      onChange={(e) => setPatientSearchTerm(e.target.value)}
+                      className="w-full"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="patientId">اختيار المريض</Label>
+                    <Select value={selectedPatientId} onValueChange={setSelectedPatientId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder={isLoadingPatients ? "جاري التحميل..." : "اختر المريض"} />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-60">
+                        {isLoadingPatients ? (
+                          <SelectItem value="loading" disabled>
+                            جاري التحميل...
+                          </SelectItem>
+                        ) : patients && patients.length > 0 ? (
+                          patients.map((patient: any) => (
+                            <SelectItem key={patient.id} value={patient.id}>
+                              {patient.firstName} {patient.lastName} - #{patient.patientNumber}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="no-results" disabled>
+                            {patientSearchTerm ? "لا توجد نتائج" : "لا توجد مرضى"}
+                          </SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
+                    {patientSearchTerm && (
+                      <p className="text-sm text-gray-500 mt-1">
+                        {patients?.length || 0} نتيجة للبحث عن "{patientSearchTerm}"
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+              
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="scheduledAt">تاريخ ووقت الزيارة</Label>
@@ -1529,63 +1675,77 @@ export default function ComprehensiveVisitSystem({
                 </div>
                 <div>
                   <Label htmlFor="cityId">المدينة</Label>
-                  <Select value={visitData.cityId} onValueChange={(value) => {
-                    setVisitData({...visitData, cityId: value, hospitalId: '', doctorId: ''})
-                  }}>
-                    <SelectTrigger>
-                      <SelectValue placeholder={isLoadingCities ? "جاري التحميل..." : "اختر المدينة"} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {isLoadingCities ? (
-                        <SelectItem value="loading" disabled>
-                          جاري التحميل...
-                        </SelectItem>
-                      ) : (
-                        cities?.map((city: any) => (
-                          <SelectItem key={city.id} value={city.id}>
-                            {city.name}
+                  {defaultCityId ? (
+                    <div className="p-3 bg-gray-50 border rounded-md">
+                      <p className="text-sm text-gray-600">المدينة محددة تلقائياً حسب مستشفاك</p>
+                      <p className="font-medium">{cities.find((c: any) => c.id === defaultCityId)?.name || 'غير محدد'}</p>
+                    </div>
+                  ) : (
+                    <Select value={visitData.cityId} onValueChange={(value) => {
+                      setVisitData({...visitData, cityId: value, hospitalId: '', doctorId: ''})
+                    }}>
+                      <SelectTrigger>
+                        <SelectValue placeholder={isLoadingCities ? "جاري التحميل..." : "اختر المدينة"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {isLoadingCities ? (
+                          <SelectItem value="loading" disabled>
+                            جاري التحميل...
                           </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
+                        ) : (
+                          cities?.map((city: any) => (
+                            <SelectItem key={city.id} value={city.id}>
+                              {city.name}
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="hospitalId">المستشفى</Label>
-                  <Select 
-                    value={visitData.hospitalId} 
-                    onValueChange={(value) => {
-                      setVisitData({...visitData, hospitalId: value, doctorId: ''})
-                    }}
-                    disabled={!visitData.cityId || isLoadingHospitals}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={
-                        isLoadingHospitals ? "جاري التحميل..." : 
-                        visitData.cityId ? "اختر المستشفى" : "اختر المدينة أولاً"
-                      } />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {isLoadingHospitals ? (
-                        <SelectItem value="loading" disabled>
-                          جاري التحميل...
-                        </SelectItem>
-                      ) : filteredHospitals?.length > 0 ? (
-                        filteredHospitals.map((hospital: any) => (
-                          <SelectItem key={hospital.id} value={hospital.id}>
-                            {hospital.name}
+                  {defaultHospitalId ? (
+                    <div className="p-3 bg-gray-50 border rounded-md">
+                      <p className="text-sm text-gray-600">المستشفى محددة تلقائياً حسب حسابك</p>
+                      <p className="font-medium">{hospitals.find((h: any) => h.id === defaultHospitalId)?.name || 'غير محدد'}</p>
+                    </div>
+                  ) : (
+                    <Select 
+                      value={visitData.hospitalId} 
+                      onValueChange={(value) => {
+                        setVisitData({...visitData, hospitalId: value, doctorId: ''})
+                      }}
+                      disabled={!visitData.cityId || isLoadingHospitals}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={
+                          isLoadingHospitals ? "جاري التحميل..." : 
+                          visitData.cityId ? "اختر المستشفى" : "اختر المدينة أولاً"
+                        } />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {isLoadingHospitals ? (
+                          <SelectItem value="loading" disabled>
+                            جاري التحميل...
                           </SelectItem>
-                        ))
-                      ) : (
-                        <SelectItem value="no-hospitals" disabled>
-                          لا توجد مستشفيات متاحة
-                        </SelectItem>
-                      )}
-                    </SelectContent>
-                  </Select>
+                        ) : filteredHospitals?.length > 0 ? (
+                          filteredHospitals.map((hospital: any) => (
+                            <SelectItem key={hospital.id} value={hospital.id}>
+                              {hospital.name}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="no-hospitals" disabled>
+                            لا توجد مستشفيات متاحة
+                          </SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
                 <div>
                   <Label htmlFor="doctorId">الطبيب</Label>
@@ -2776,6 +2936,19 @@ export default function ComprehensiveVisitSystem({
           </div>
         </div>
       </div>
+
+      {/* Visit Details Modal */}
+      {showVisitDetails && createdVisitId && (
+        <VisitDetailsModal
+          isOpen={showVisitDetails}
+          onClose={() => {
+            setShowVisitDetails(false)
+            setCreatedVisitId(null)
+            onClose() // Close the main form after viewing details
+          }}
+          visitId={createdVisitId}
+        />
+      )}
     </div>
   )
 }

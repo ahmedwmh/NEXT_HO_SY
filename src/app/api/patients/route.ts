@@ -111,6 +111,8 @@ export async function POST(request: NextRequest) {
       maritalStatus,
       occupation,
       notes,
+      profilePhoto,
+      patientImages,
       hospitalId,
       selectedTests
     } = await request.json()
@@ -229,6 +231,7 @@ export async function POST(request: NextRequest) {
         maritalStatus: maritalStatus || null,
         occupation: occupation?.trim() || null,
         notes: notes?.trim() || null,
+        profilePhoto: profilePhoto?.trim() || null,
         hospitalId,
         isActive: true
       },
@@ -245,6 +248,22 @@ export async function POST(request: NextRequest) {
         }
       }
     })
+
+    // Create patient images if provided
+    if (patientImages && Array.isArray(patientImages) && patientImages.length > 0) {
+      const imageData = patientImages.map((imageUrl: string, index: number) => ({
+        patientId: patient.id,
+        imageUrl: imageUrl,
+        title: `صورة المريض ${index + 1}`,
+        description: `صورة إضافية للمريض ${patient.patientNumber}`,
+        type: 'patient_photo',
+        isActive: true
+      }))
+
+      await prisma.patientImage.createMany({
+        data: imageData
+      })
+    }
 
     // Create tests if selected
     if (selectedTests && Array.isArray(selectedTests) && selectedTests.length > 0) {

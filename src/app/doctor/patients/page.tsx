@@ -20,6 +20,7 @@ interface Patient {
   email: string | null
   address: string | null
   bloodType: string | null
+  idNumber: string | null
   hospital: {
     id: string
     name: string
@@ -35,18 +36,31 @@ export default function DoctorPatientsPage() {
   const { hospitalId, filteredData, loading, error } = useDoctorDataFilter()
   const [patients, setPatients] = useState<Patient[]>([])
   const [searchTerm, setSearchTerm] = useState('')
+  const [isLoadingPatients, setIsLoadingPatients] = useState(true)
 
   useEffect(() => {
-    if (filteredData.patients) {
-      // Ensure patients have the required hospital and city properties
-      const patientsWithRelations = filteredData.patients.map((patient: any) => ({
-        ...patient,
-        hospital: patient.hospital || { id: '', name: 'غير محدد' },
-        city: patient.city || { id: '', name: 'غير محدد' }
-      }))
-      setPatients(patientsWithRelations)
+    // Always show loading when data is being fetched
+    if (loading) {
+      setIsLoadingPatients(true)
+      return
     }
-  }, [filteredData.patients])
+    
+    // Only set loading to false when we have received the data
+    if (filteredData.patients !== undefined) {
+      if (filteredData.patients && filteredData.patients.length > 0) {
+        // Ensure patients have the required hospital and city properties
+        const patientsWithRelations = filteredData.patients.map((patient: any) => ({
+          ...patient,
+          hospital: patient.hospital || { id: '', name: 'غير محدد' },
+          city: patient.city || { id: '', name: 'غير محدد' }
+        }))
+        setPatients(patientsWithRelations)
+      } else {
+        setPatients([])
+      }
+      setIsLoadingPatients(false)
+    }
+  }, [filteredData.patients, loading])
 
   const fetchPatients = async () => {
     if (!hospitalId) return
@@ -135,6 +149,15 @@ export default function DoctorPatientsPage() {
           <Badge variant="secondary">{value}</Badge>
         ) : '-'
       )
+    },
+    {
+      key: 'idNumber',
+      label: 'رقم الهوية',
+      render: (value: string | null) => (
+        value ? (
+          <span className="font-mono text-sm">{value}</span>
+        ) : '-'
+      )
     }
   ]
 
@@ -180,13 +203,14 @@ export default function DoctorPatientsPage() {
     window.location.href = `/doctor/tests/new?patientId=${patient.id}`
   }
 
+
   return (
     <div className="w-full space-y-6">
       <UniversalTable
         title="مرضى المستشفى"
         data={patients}
         columns={columns}
-        searchFields={['firstName', 'lastName', 'patientNumber']}
+        searchFields={['firstName', 'lastName', 'patientNumber', 'idNumber']}
         filters={filters}
         customActions={(patient: Patient) => [
           {
@@ -211,7 +235,7 @@ export default function DoctorPatientsPage() {
         onAdd={() => window.location.href = '/doctor/patients/new'}
         addButtonText="إضافة مريض جديد"
         emptyMessage="لا توجد مرضى في مستشفاك"
-        loading={loading}
+        loading={isLoadingPatients}
         itemsPerPage={10}
         showPagination={true}
         showSearch={true}

@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
+import { getAuthenticatedUser, canAccessHospital } from '@/lib/auth-middleware'
 
 // جلب المستشفيات
 export async function GET(request: NextRequest) {
   try {
+    const user = await getAuthenticatedUser(request)
+    if (!user) {
+      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 })
+    }
+
     const { searchParams } = new URL(request.url)
     const cityId = searchParams.get('cityId')
     const hospitalId = searchParams.get('hospitalId')
@@ -15,7 +21,18 @@ export async function GET(request: NextRequest) {
     }
     
     if (hospitalId) {
+      // Check if user can access this hospital
+      if (!canAccessHospital(user, hospitalId)) {
+        return NextResponse.json({ error: 'غير مصرح للوصول لهذا المستشفى' }, { status: 403 })
+      }
       whereClause.id = hospitalId
+    } else if (user.role !== 'ADMIN') {
+      // Non-admin users can only see their hospital
+      if (user.hospitalId) {
+        whereClause.id = user.hospitalId
+      } else {
+        return NextResponse.json({ error: 'غير مصرح' }, { status: 403 })
+      }
     }
 
     const hospitals = await prisma.hospital.findMany({

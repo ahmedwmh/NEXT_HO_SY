@@ -9,6 +9,8 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '30')
     const status = searchParams.get('status')
     const patientId = searchParams.get('patientId')
+    const hospitalId = searchParams.get('hospitalId')
+    const doctorId = searchParams.get('doctorId')
     const search = searchParams.get('search')
     const skip = (page - 1) * limit
 
@@ -19,6 +21,15 @@ export async function GET(request: NextRequest) {
     }
     if (patientId) {
       whereClause.patientId = patientId
+    }
+    if (hospitalId) {
+      // Decode hospitalId if it's URL encoded and handle spaces
+      const decodedHospitalId = decodeURIComponent(hospitalId).replace(/\+/g, ' ')
+      whereClause.hospitalId = decodedHospitalId
+      console.log('🔍 Hospital ID:', decodedHospitalId)
+    }
+    if (doctorId) {
+      whereClause.doctorId = doctorId
     }
     
     if (search) {
@@ -33,6 +44,8 @@ export async function GET(request: NextRequest) {
       ]
     }
 
+    console.log('🔍 Where clause:', JSON.stringify(whereClause, null, 2))
+    
     const [visitsBase, total] = await Promise.all([
       prisma.visit.findMany({
         where: whereClause,
@@ -72,17 +85,43 @@ export async function GET(request: NextRequest) {
             }
           },
           tests: {
-            select: { id: true, name: true, description: true, status: true }
+            select: { 
+              id: true, 
+              name: true, 
+              description: true, 
+              status: true,
+              results: true,
+              scheduledAt: true
+            }
           },
           treatments: {
-            select: { id: true, name: true, description: true, status: true }
+            select: { 
+              id: true, 
+              name: true, 
+              description: true, 
+              status: true,
+              scheduledAt: true
+            }
           },
           operations: {
-            select: { id: true, name: true, description: true, status: true }
+            select: { 
+              id: true, 
+              name: true, 
+              description: true, 
+              status: true,
+              scheduledAt: true
+            }
           },
           medications: {
-            select: { id: true, name: true, dosage: true, frequency: true, duration: true, instructions: true }
-          }
+            select: { 
+              id: true, 
+              name: true, 
+              dosage: true, 
+              frequency: true, 
+              duration: true, 
+              instructions: true
+            }
+          },
         },
         orderBy: { scheduledAt: 'desc' },
         skip,
@@ -93,27 +132,6 @@ export async function GET(request: NextRequest) {
 
     // Attach patient diseases to each visit (no direct relation in schema)
     let visits = visitsBase as any[]
-    try {
-      const patientIds = Array.from(new Set(visitsBase.map(v => v.patientId)))
-      if (patientIds.length > 0) {
-        const diseasesByPatient: Record<string, any[]> = {}
-        const diseases = await prisma.disease.findMany({
-          where: { patientId: { in: patientIds } },
-          select: { id: true, name: true, description: true, diagnosedAt: true, severity: true, status: true }
-        })
-        for (const d of diseases) {
-          const patientId = (d as any).patientId
-          if (!diseasesByPatient[patientId]) diseasesByPatient[patientId] = [] as any
-          ;(diseasesByPatient[patientId] as any[]).push(d as any)
-        }
-        visits = visitsBase.map(v => ({
-          ...v,
-          diseases: diseasesByPatient[v.patientId] || []
-        }))
-      }
-    } catch (e) {
-      console.error('Failed to attach diseases to visits:', e)
-    }
 
     // Enrich with patient-level tests/treatments/operations/medications around the visit date (or linked by visitId)
     try {

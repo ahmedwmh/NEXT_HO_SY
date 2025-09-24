@@ -22,24 +22,22 @@ export function useDoctorDataFilter(options: UseDoctorDataOptions = {}) {
 
   // Fetch data filtered by doctor's hospital
   const fetchFilteredData = async () => {
-    if (!hospitalId) return
+    if (!hospitalId || !cityId) return
 
     try {
-      // Fetch patients from doctor's hospital
+      // Fetch patients from doctor's hospital only
       const patientsResponse = await fetch(`/api/patients?hospitalId=${hospitalId}`)
       const patientsData = await patientsResponse.json()
       
-      // Fetch hospitals (only doctor's hospital for non-admin)
-      const hospitalsResponse = await fetch(`/api/hospitals?hospitalId=${hospitalId}`)
-      const hospitalsData = await hospitalsResponse.json()
+      // For doctors, only show their hospital
+      const hospitalsData = { data: hospital ? [hospital] : [] }
       
-      // Fetch doctors from doctor's hospital
+      // Fetch doctors from doctor's hospital only
       const doctorsResponse = await fetch(`/api/doctors?hospitalId=${hospitalId}`)
       const doctorsData = await doctorsResponse.json()
       
-      // Fetch cities (only doctor's city for non-admin)
-      const citiesResponse = await fetch(`/api/cities?cityId=${cityId}`)
-      const citiesData = await citiesResponse.json()
+      // For doctors, only show their city
+      const citiesData = { data: city ? [city] : [] }
 
       setFilteredData({
         patients: patientsData.data || [],
@@ -53,10 +51,10 @@ export function useDoctorDataFilter(options: UseDoctorDataOptions = {}) {
   }
 
   useEffect(() => {
-    if (hospitalId) {
+    if (hospitalId && cityId) {
       fetchFilteredData()
     }
-  }, [hospitalId])
+  }, [hospitalId, cityId])
 
   return {
     doctor,

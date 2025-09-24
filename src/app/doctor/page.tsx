@@ -174,32 +174,6 @@ export default function DoctorDashboard() {
         </Card>
       </div>
 
-      {/* Quick Actions */}
-      <Card>
-        <CardHeader>
-          <CardTitle>الإجراءات السريعة</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Button className="h-20 flex flex-col items-center justify-center space-y-2">
-              <Users className="h-6 w-6" />
-              <span>عرض المرضى</span>
-            </Button>
-            <Button variant="outline" className="h-20 flex flex-col items-center justify-center space-y-2">
-              <Activity className="h-6 w-6" />
-              <span>إضافة زيارة</span>
-            </Button>
-            <Button variant="outline" className="h-20 flex flex-col items-center justify-center space-y-2">
-              <TestTube className="h-6 w-6" />
-              <span>طلب فحص</span>
-            </Button>
-            <Button variant="outline" className="h-20 flex flex-col items-center justify-center space-y-2">
-              <FileText className="h-6 w-6" />
-              <span>عرض التقارير</span>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Recent Activity */}
       <Card>

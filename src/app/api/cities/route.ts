@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
+import { getAuthenticatedUser } from '@/lib/auth-middleware'
 
 export async function GET(request: NextRequest) {
   try {
+    const user = await getAuthenticatedUser(request)
+    if (!user) {
+      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 })
+    }
+
     const { searchParams } = new URL(request.url)
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '30')
@@ -13,6 +19,9 @@ export async function GET(request: NextRequest) {
     
     if (cityId) {
       whereClause.id = cityId
+    } else if (user.role !== 'ADMIN') {
+      // Non-admin users can see all cities for now
+      // TODO: Implement city-based filtering when needed
     }
 
     const [cities, total] = await Promise.all([
