@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { HospitalManagementGuard } from '@/lib/admin-guard'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -28,7 +29,7 @@ interface Hospital {
   createdAt: string
 }
 
-export default function HospitalsPage() {
+function HospitalsPageContent() {
   const [hospitals, setHospitals] = useState<Hospital[]>([])
   const [cities, setCities] = useState<City[]>([])
   const [loading, setLoading] = useState(true)
@@ -341,5 +342,13 @@ export default function HospitalsPage() {
       )}
 
     </div>
+  )
+}
+
+export default function HospitalsPage() {
+  return (
+    <HospitalManagementGuard>
+      <HospitalsPageContent />
+    </HospitalManagementGuard>
   )
 }

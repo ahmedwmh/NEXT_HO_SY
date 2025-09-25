@@ -155,18 +155,18 @@ export default function DoctorTestsPage() {
   ]
 
   const handleAdd = () => {
-    // Navigate to add test page or open modal
-    console.log('Add test')
+    // Navigate to add test page
+    window.location.href = '/doctor/tests/new'
   }
 
   const handleEdit = (test: Test) => {
-    // Navigate to edit test page or open modal
-    console.log('Edit test:', test.id)
+    // Navigate to edit test page
+    window.location.href = `/doctor/tests/${test.id}/edit`
   }
 
   const handleView = (test: Test) => {
     // Navigate to test details
-    console.log('View test:', test.id)
+    window.location.href = `/doctor/tests/${test.id}`
   }
 
   const handleDelete = async (test: Test) => {

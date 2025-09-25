@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { DoctorProvider } from '@/contexts/doctor-context'
+import { DoctorOnlyGuard } from '@/components/auth/role-guard'
 import { 
   LayoutDashboard, 
   Users, 
@@ -31,7 +32,7 @@ const navigation = [
   { name: 'الإعدادات', href: '/doctor/settings', icon: Settings },
 ]
 
-export default function DoctorLayout({
+function DoctorLayoutContent({
   children,
 }: {
   children: React.ReactNode
@@ -87,14 +88,16 @@ export default function DoctorLayout({
         </nav>
 
         <div className="absolute bottom-0 w-full p-4 border-t border-gray-200">
-          <Button
-            variant="outline"
-            className="w-full justify-start"
-            onClick={() => {
-              // Handle logout
-              window.location.href = '/auth/login'
-            }}
-          >
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start"
+                    onClick={() => {
+                      // Handle logout
+                      localStorage.removeItem('user')
+                      localStorage.removeItem('token')
+                      window.location.href = '/'
+                    }}
+                  >
             <LogOut className="h-4 w-4 ml-2" />
             تسجيل الخروج
           </Button>
@@ -137,5 +140,19 @@ export default function DoctorLayout({
       )}
       </div>
     </DoctorProvider>
+  )
+}
+
+export default function DoctorLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <DoctorOnlyGuard>
+      <DoctorLayoutContent>
+        {children}
+      </DoctorLayoutContent>
+    </DoctorOnlyGuard>
   )
 }

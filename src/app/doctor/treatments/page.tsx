@@ -181,18 +181,18 @@ export default function DoctorTreatmentsPage() {
   ]
 
   const handleAdd = () => {
-    // Navigate to add treatment page or open modal
-    console.log('Add treatment')
+    // Navigate to add treatment page
+    window.location.href = '/doctor/treatments/new'
   }
 
   const handleEdit = (treatment: Treatment) => {
-    // Navigate to edit treatment page or open modal
-    console.log('Edit treatment:', treatment.id)
+    // Navigate to edit treatment page
+    window.location.href = `/doctor/treatments/${treatment.id}/edit`
   }
 
   const handleView = (treatment: Treatment) => {
     // Navigate to treatment details
-    console.log('View treatment:', treatment.id)
+    window.location.href = `/doctor/treatments/${treatment.id}`
   }
 
   const handleDelete = async (treatment: Treatment) => {

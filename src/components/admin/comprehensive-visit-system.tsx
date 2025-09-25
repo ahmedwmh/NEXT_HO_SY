@@ -631,12 +631,19 @@ export default function ComprehensiveVisitSystem({
   })
 
   const { data: availableTests, isLoading: isLoadingTests } = useQuery({
-    queryKey: ['hospital-tests'],
+    queryKey: ['hospital-tests', visitData.hospitalId],
     queryFn: async () => {
       console.log('🧪 ===== FETCHING AVAILABLE TESTS =====')
-      console.log('🌐 API endpoint: /api/hospital-tests')
+      console.log('🏥 Hospital ID:', visitData.hospitalId)
       
-      const response = await fetch('/api/hospital-tests')
+      // Build API URL with hospital filter
+      const apiUrl = visitData.hospitalId 
+        ? `/api/hospital-tests?hospitalId=${visitData.hospitalId}`
+        : '/api/hospital-tests'
+      
+      console.log('🌐 API endpoint:', apiUrl)
+      
+      const response = await fetch(apiUrl)
       console.log('📡 Response status:', response.status)
       
       if (!response.ok) {
@@ -647,16 +654,15 @@ export default function ComprehensiveVisitSystem({
       console.log('📥 Raw API response:', JSON.stringify(result, null, 2))
       
       const allTests = result.data || []
-      console.log('🧪 All tests count:', allTests.length)
+      console.log('🧪 Filtered tests count:', allTests.length)
       
       return allTests
-    }
+    },
+    enabled: !!visitData.hospitalId // Only fetch when hospital is selected
   })
 
-  // Filter tests by selected hospital
-  const filteredTests = availableTests?.filter((test: any) => 
-    !visitData.hospitalId || test.hospitalId === visitData.hospitalId
-  ) || []
+  // Tests are already filtered by hospital from API
+  const filteredTests = availableTests || []
   
   console.log('🧪 Debug - availableTests count:', availableTests?.length || 0)
   console.log('🧪 Debug - visitData.hospitalId:', visitData.hospitalId)
@@ -664,11 +670,19 @@ export default function ComprehensiveVisitSystem({
   console.log('🧪 Debug - filteredTests sample:', filteredTests.slice(0, 3))
 
   const { data: availableDiseases, isLoading: isLoadingDiseases } = useQuery({
-    queryKey: ['hospital-diseases'],
+    queryKey: ['hospital-diseases', visitData.hospitalId],
     queryFn: async () => {
       console.log('🦠 ===== FETCHING AVAILABLE DISEASES =====')
+      console.log('🏥 Hospital ID:', visitData.hospitalId)
       
-      const response = await fetch('/api/hospital-diseases')
+      // Build API URL with hospital filter
+      const apiUrl = visitData.hospitalId 
+        ? `/api/hospital-diseases?hospitalId=${visitData.hospitalId}`
+        : '/api/hospital-diseases'
+      
+      console.log('🌐 API endpoint:', apiUrl)
+      
+      const response = await fetch(apiUrl)
       
       if (!response.ok) {
         throw new Error('Failed to fetch diseases')
@@ -676,27 +690,34 @@ export default function ComprehensiveVisitSystem({
       
       const result = await response.json()
       const allDiseases = result.data || []
-      console.log('🦠 All diseases count:', allDiseases.length)
+      console.log('🦠 Filtered diseases count:', allDiseases.length)
       
       return allDiseases
-    }
+    },
+    enabled: !!visitData.hospitalId // Only fetch when hospital is selected
   })
 
-  // Filter diseases by selected hospital
-  const filteredDiseases = availableDiseases?.filter((disease: any) => 
-    !visitData.hospitalId || disease.hospitalId === visitData.hospitalId
-  ) || []
+  // Diseases are already filtered by hospital from API
+  const filteredDiseases = availableDiseases || []
   
   console.log('🦠 Debug - availableDiseases count:', availableDiseases?.length || 0)
   console.log('🦠 Debug - filteredDiseases count:', filteredDiseases.length)
   console.log('🦠 Debug - filteredDiseases sample:', filteredDiseases.slice(0, 3))
 
   const { data: hospitalTreatments, isLoading: isLoadingTreatments } = useQuery({
-    queryKey: ['hospital-treatments'],
+    queryKey: ['hospital-treatments', visitData.hospitalId],
     queryFn: async () => {
       console.log('💊 ===== FETCHING AVAILABLE TREATMENTS =====')
+      console.log('🏥 Hospital ID:', visitData.hospitalId)
       
-      const response = await fetch('/api/hospital-treatments')
+      // Build API URL with hospital filter
+      const apiUrl = visitData.hospitalId 
+        ? `/api/hospital-treatments?hospitalId=${visitData.hospitalId}`
+        : '/api/hospital-treatments'
+      
+      console.log('🌐 API endpoint:', apiUrl)
+      
+      const response = await fetch(apiUrl)
       
       if (!response.ok) {
         throw new Error('Failed to fetch treatments')
@@ -704,16 +725,15 @@ export default function ComprehensiveVisitSystem({
       
       const result = await response.json()
       const allTreatments = result.data || []
-      console.log('💊 All hospital treatments count:', allTreatments.length)
+      console.log('💊 Filtered treatments count:', allTreatments.length)
       
       return allTreatments
-    }
+    },
+    enabled: !!visitData.hospitalId // Only fetch when hospital is selected
   })
 
-  // Filter treatment courses by selected hospital
-  const filteredTreatments = hospitalTreatments?.filter((treatment: any) => 
-    !visitData.hospitalId || treatment.hospitalId === visitData.hospitalId
-  ) || []
+  // Treatments are already filtered by hospital from API
+  const filteredTreatments = hospitalTreatments || []
   
   console.log('💊 Debug - hospitalTreatments count:', hospitalTreatments?.length || 0)
   console.log('💊 Debug - filteredTreatments count:', filteredTreatments.length)

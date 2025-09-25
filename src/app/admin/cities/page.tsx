@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { CityManagementGuard } from '@/lib/admin-guard'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -15,7 +16,7 @@ interface City {
   hospitals: { id: string; name: string }[]
 }
 
-export default function CitiesPage() {
+function CitiesPageContent() {
   const [cities, setCities] = useState<City[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -249,5 +250,13 @@ export default function CitiesPage() {
         </Card>
       )}
     </div>
+  )
+}
+
+export default function CitiesPage() {
+  return (
+    <CityManagementGuard>
+      <CitiesPageContent />
+    </CityManagementGuard>
   )
 }

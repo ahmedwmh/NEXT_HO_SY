@@ -25,10 +25,6 @@ export function useDoctorDataFilter(options: UseDoctorDataOptions = {}) {
     if (!hospitalId || !cityId) return
 
     try {
-      // Fetch patients from doctor's hospital only
-      const patientsResponse = await fetch(`/api/patients?hospitalId=${hospitalId}`)
-      const patientsData = await patientsResponse.json()
-      
       // For doctors, only show their hospital
       const hospitalsData = { data: hospital ? [hospital] : [] }
       
@@ -40,7 +36,7 @@ export function useDoctorDataFilter(options: UseDoctorDataOptions = {}) {
       const citiesData = { data: city ? [city] : [] }
 
       setFilteredData({
-        patients: patientsData.data || [],
+        patients: [], // Don't fetch patients here - let the component handle it
         hospitals: hospitalsData.data || [],
         doctors: doctorsData.data || [],
         cities: citiesData.data || []

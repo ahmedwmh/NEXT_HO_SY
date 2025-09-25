@@ -1,13 +1,13 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { UniversalTable } from '@/components/ui/universal-table'
 import { useDoctorDataFilter } from '@/hooks/use-doctor-data'
-import { Plus, Search, Edit, Eye, Phone, Mail, MapPin, Calendar } from 'lucide-react'
+import { Plus, Search, Edit, Eye, Phone, Mail, MapPin, Calendar, RefreshCw } from 'lucide-react'
 
 interface Patient {
   id: string
@@ -33,23 +33,32 @@ interface Patient {
 }
 
 export default function DoctorPatientsPage() {
-  const { hospitalId, filteredData, loading, error } = useDoctorDataFilter()
+  const { hospitalId, loading: doctorLoading, error: doctorError } = useDoctorDataFilter()
   const [patients, setPatients] = useState<Patient[]>([])
-  const [searchTerm, setSearchTerm] = useState('')
   const [isLoadingPatients, setIsLoadingPatients] = useState(true)
+  const [patientsError, setPatientsError] = useState<string | null>(null)
 
-  useEffect(() => {
-    // Always show loading when data is being fetched
-    if (loading) {
-      setIsLoadingPatients(true)
+  const fetchPatients = useCallback(async () => {
+    if (!hospitalId) {
+      setIsLoadingPatients(false)
       return
     }
     
-    // Only set loading to false when we have received the data
-    if (filteredData.patients !== undefined) {
-      if (filteredData.patients && filteredData.patients.length > 0) {
+    try {
+      setIsLoadingPatients(true)
+      setPatientsError(null)
+      
+      const response = await fetch(`/api/patients?hospitalId=${hospitalId}`)
+      
+      if (!response.ok) {
+        throw new Error(`خطأ في الخادم: ${response.status}`)
+      }
+      
+      const data = await response.json()
+      
+      if (data.data && data.data.length > 0) {
         // Ensure patients have the required hospital and city properties
-        const patientsWithRelations = filteredData.patients.map((patient: any) => ({
+        const patientsWithRelations = data.data.map((patient: any) => ({
           ...patient,
           hospital: patient.hospital || { id: '', name: 'غير محدد' },
           city: patient.city || { id: '', name: 'غير محدد' }
@@ -58,21 +67,29 @@ export default function DoctorPatientsPage() {
       } else {
         setPatients([])
       }
-      setIsLoadingPatients(false)
-    }
-  }, [filteredData.patients, loading])
-
-  const fetchPatients = async () => {
-    if (!hospitalId) return
-    
-    try {
-      const response = await fetch(`/api/patients?hospitalId=${hospitalId}`)
-      const data = await response.json()
-      setPatients(data.data || data || [])
     } catch (error) {
       console.error('خطأ في جلب المرضى:', error)
+      setPatientsError(error instanceof Error ? error.message : 'حدث خطأ في جلب المرضى')
+      setPatients([])
+    } finally {
+      setIsLoadingPatients(false)
     }
-  }
+  }, [hospitalId])
+
+  useEffect(() => {
+    // Show loading while doctor data is being fetched
+    if (doctorLoading) {
+      setIsLoadingPatients(true)
+      setPatientsError(null)
+      return
+    }
+    
+    // Once doctor data is loaded, start fetching patients
+    if (hospitalId && !doctorLoading) {
+      fetchPatients()
+    }
+  }, [hospitalId, doctorLoading, fetchPatients])
+
 
   const columns = [
     {
@@ -91,8 +108,11 @@ export default function DoctorPatientsPage() {
       sortable: true,
       searchable: true,
       render: (value: any, patient: Patient) => (
-        <div>
-          <p className="font-semibold">{patient.firstName} {patient.lastName}</p>
+        <div 
+          className="cursor-pointer hover:bg-gray-50 p-2 rounded-md transition-colors"
+          onClick={() => handleViewPatient(patient)}
+        >
+          <p className="font-semibold text-blue-600 hover:text-blue-800">{patient.firstName} {patient.lastName}</p>
           <p className="text-sm text-gray-500">{patient.gender === 'male' ? 'ذكر' : 'أنثى'}</p>
         </div>
       )
@@ -203,11 +223,80 @@ export default function DoctorPatientsPage() {
     window.location.href = `/doctor/tests/new?patientId=${patient.id}`
   }
 
+  const handleRefresh = useCallback(() => {
+    if (hospitalId) {
+      fetchPatients()
+    }
+  }, [hospitalId, fetchPatients])
+
+
+  // Show error state
+  if (doctorError) {
+    return (
+      <div className="w-full space-y-6">
+        <Card>
+          <CardContent className="p-6">
+            <div className="text-center">
+              <h3 className="text-lg font-semibold text-red-600 mb-2">خطأ في تحميل البيانات</h3>
+              <p className="text-gray-600 mb-4">{doctorError}</p>
+              <Button onClick={() => window.location.reload()}>
+                إعادة المحاولة
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  // Show patients error
+  if (patientsError) {
+    return (
+      <div className="w-full space-y-6">
+        <Card>
+          <CardContent className="p-6">
+            <div className="text-center">
+              <h3 className="text-lg font-semibold text-red-600 mb-2">خطأ في جلب المرضى</h3>
+              <p className="text-gray-600 mb-4">{patientsError}</p>
+              <Button onClick={fetchPatients}>
+                إعادة المحاولة
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
 
   return (
     <div className="w-full space-y-6">
+      {/* Header with refresh button */}
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">مرضى المستشفى</h1>
+          <p className="text-gray-600 mt-1">
+            {isLoadingPatients ? (
+              'جاري التحميل...'
+            ) : patients.length > 0 ? (
+              `إجمالي المرضى: ${patients.length}`
+            ) : (
+              'لا توجد مرضى في مستشفاك'
+            )}
+          </p>
+        </div>
+        <Button 
+          onClick={handleRefresh} 
+          disabled={isLoadingPatients}
+          variant="outline"
+          className="flex items-center gap-2"
+        >
+          <RefreshCw className={`h-4 w-4 ${isLoadingPatients ? 'animate-spin' : ''}`} />
+          تحديث
+        </Button>
+      </div>
+
       <UniversalTable
-        title="مرضى المستشفى"
+        title=""
         data={patients}
         columns={columns}
         searchFields={['firstName', 'lastName', 'patientNumber', 'idNumber']}

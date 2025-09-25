@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { SensitiveAdminGuard } from '@/lib/admin-guard'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -56,7 +57,7 @@ const specializations = [
   'الطب النفسي'
 ]
 
-export default function DoctorsPage() {
+function DoctorsPageContent() {
   const [doctors, setDoctors] = useState<Doctor[]>([])
   const [cities, setCities] = useState<City[]>([])
   const [hospitals, setHospitals] = useState<Hospital[]>([])
@@ -387,5 +388,13 @@ export default function DoctorsPage() {
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+export default function DoctorsPage() {
+  return (
+    <SensitiveAdminGuard>
+      <DoctorsPageContent />
+    </SensitiveAdminGuard>
   )
 }

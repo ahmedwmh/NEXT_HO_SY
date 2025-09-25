@@ -155,18 +155,18 @@ export default function DoctorOperationsPage() {
   ]
 
   const handleAdd = () => {
-    // Navigate to add operation page or open modal
-    console.log('Add operation')
+    // Navigate to add operation page
+    window.location.href = '/doctor/operations/new'
   }
 
   const handleEdit = (operation: Operation) => {
-    // Navigate to edit operation page or open modal
-    console.log('Edit operation:', operation.id)
+    // Navigate to edit operation page
+    window.location.href = `/doctor/operations/${operation.id}/edit`
   }
 
   const handleView = (operation: Operation) => {
     // Navigate to operation details
-    console.log('View operation:', operation.id)
+    window.location.href = `/doctor/operations/${operation.id}`
   }
 
   const handleDelete = async (operation: Operation) => {

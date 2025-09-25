@@ -18,6 +18,29 @@ enum UserRole {
   STAFF
 }
 
+enum PermissionType {
+  READ
+  WRITE
+  DELETE
+  MANAGE
+}
+
+enum ResourceType {
+  PATIENTS
+  VISITS
+  TESTS
+  TREATMENTS
+  OPERATIONS
+  MEDICATIONS
+  PRESCRIPTIONS
+  REPORTS
+  SETTINGS
+  USERS
+  HOSPITALS
+  CITIES
+  DISEASES
+}
+
 enum VisitStatus {
   SCHEDULED
   IN_PROGRESS
@@ -52,16 +75,104 @@ model User {
   email     String   @unique
   password  String
   role      UserRole
+  roleId    String?  // ربط بدور مخصص
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Relations
   doctorProfile Doctor?
   staffProfile  Staff?
+  customRole    Role?           @relation(fields: [roleId], references: [id], onDelete: SetNull)
+  permissions   UserPermission[]
 
   @@index([email])
   @@index([role])
+  @@index([roleId])
   @@map("users")
+}
+
+// ===== PERMISSIONS SYSTEM =====
+// نظام الصلاحيات المتقدم
+
+model Permission {
+  id          String         @id @default(cuid())
+  name        String         @unique
+  description String?
+  resource    ResourceType
+  action      PermissionType
+  isActive    Boolean        @default(true)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  // Relations
+  rolePermissions RolePermission[]
+  userPermissions UserPermission[]
+
+  @@index([resource])
+  @@index([action])
+  @@index([isActive])
+  @@map("permissions")
+}
+
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  isSystem    Boolean  @default(false) // هل هي دور نظام (لا يمكن حذفها)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  rolePermissions RolePermission[]
+  users          User[]
+
+  @@index([name])
+  @@index([isSystem])
+  @@index([isActive])
+  @@map("roles")
+}
+
+model RolePermission {
+  id           String     @id @default(cuid())
+  roleId       String
+  permissionId String
+  granted      Boolean    @default(true) // هل مُنحت الصلاحية أم مُنعت
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  // Relations
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+  @@index([roleId])
+  @@index([permissionId])
+  @@map("role_permissions")
+}
+
+model UserPermission {
+  id           String     @id @default(cuid())
+  userId       String
+  permissionId String
+  granted      Boolean    @default(true) // هل مُنحت الصلاحية أم مُنعت
+  hospitalId   String?    // صلاحية محددة لمستشفى معين
+  expiresAt    DateTime?  // تاريخ انتهاء الصلاحية
+  grantedBy    String?    // من منح الصلاحية
+  reason       String?    // سبب منح/منع الصلاحية
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  // Relations
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  hospital   Hospital?  @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([permissionId])
+  @@index([hospitalId])
+  @@index([expiresAt])
+  @@map("user_permissions")
 }
 
 model City {
@@ -107,6 +218,9 @@ model Hospital {
   hospitalTreatments HospitalTreatment[]
   hospitalOperations HospitalOperation[]
   treatmentCourses   TreatmentCourse[] // الكورسات العلاجية
+  
+  // Permissions
+  userPermissions UserPermission[]
 
   @@index([cityId])
   @@index([name])

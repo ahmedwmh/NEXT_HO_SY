@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { SensitiveAdminGuard } from '@/lib/admin-guard'
 import { DataTable } from '@/components/ui/data-table'
 import { FormModal } from '@/components/ui/form-modal'
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
@@ -51,7 +52,7 @@ const staffPositions = [
   'محاسب'
 ]
 
-export default function StaffPage() {
+function StaffPageContent() {
   const [cities, setCities] = useState<City[]>([])
   const [hospitals, setHospitals] = useState<Hospital[]>([])
   const [filteredHospitals, setFilteredHospitals] = useState<Hospital[]>([])
@@ -346,5 +347,13 @@ export default function StaffPage() {
         type="danger"
       />
     </div>
+  )
+}
+
+export default function StaffPage() {
+  return (
+    <SensitiveAdminGuard>
+      <StaffPageContent />
+    </SensitiveAdminGuard>
   )
 }
