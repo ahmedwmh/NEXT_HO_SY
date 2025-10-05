@@ -11,7 +11,6 @@ import {
   Stethoscope, 
   Building, 
   MapPin,
-  Eye,
   Edit,
   Trash2,
   Plus,
@@ -190,10 +189,6 @@ export default function DoctorTreatmentsPage() {
     window.location.href = `/doctor/treatments/${treatment.id}/edit`
   }
 
-  const handleView = (treatment: Treatment) => {
-    // Navigate to treatment details
-    window.location.href = `/doctor/treatments/${treatment.id}`
-  }
 
   const handleDelete = async (treatment: Treatment) => {
     if (confirm('هل أنت متأكد من حذف هذا العلاج؟')) {
@@ -256,7 +251,6 @@ export default function DoctorTreatmentsPage() {
           ]}
           onAdd={handleAdd}
           onEdit={handleEdit}
-          onView={handleView}
           onDelete={handleDelete}
           onRefresh={handleRefresh}
           addButtonText="إضافة علاج جديد"

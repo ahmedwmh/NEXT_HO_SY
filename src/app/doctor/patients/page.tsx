@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { UniversalTable } from '@/components/ui/universal-table'
 import { useDoctorDataFilter } from '@/hooks/use-doctor-data'
-import { Plus, Search, Edit, Eye, Phone, Mail, MapPin, Calendar, RefreshCw } from 'lucide-react'
+import { Plus, Search, Edit, Eye, Phone, Mail, MapPin, Calendar, RefreshCw, Trash2 } from 'lucide-react'
 
 interface Patient {
   id: string
@@ -213,6 +213,38 @@ export default function DoctorPatientsPage() {
     window.location.href = `/doctor/patients/${patient.id}`
   }
 
+  const handleEditPatient = (patient: Patient) => {
+    // Navigate to edit patient page
+    window.location.href = `/doctor/patients/${patient.id}/edit`
+  }
+
+  const handleDeletePatient = async (patient: Patient) => {
+    if (!confirm(`هل أنت متأكد من حذف المريض ${patient.firstName} ${patient.lastName}؟\n\nهذا الإجراء لا يمكن التراجع عنه.`)) {
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/patients/${patient.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (response.ok) {
+        alert('تم حذف المريض بنجاح')
+        // Refresh the patients list
+        fetchPatients()
+      } else {
+        const error = await response.json()
+        alert(error.error || 'فشل في حذف المريض')
+      }
+    } catch (error) {
+      console.error('خطأ في حذف المريض:', error)
+      alert('فشل في حذف المريض')
+    }
+  }
+
   const handleAddVisit = (patient: Patient) => {
     // Navigate to add visit for this patient
     window.location.href = `/doctor/visits/new?patientId=${patient.id}`
@@ -303,22 +335,16 @@ export default function DoctorPatientsPage() {
         filters={filters}
         customActions={(patient: Patient) => [
           {
-            label: 'عرض التفاصيل',
-            onClick: () => handleViewPatient(patient),
-            icon: Eye,
+            label: 'تعديل المريض',
+            onClick: () => handleEditPatient(patient),
+            icon: Edit,
             variant: 'outline' as const
           },
           {
-            label: 'إضافة زيارة',
-            onClick: () => handleAddVisit(patient),
-            icon: Calendar,
-            variant: 'outline' as const
-          },
-          {
-            label: 'طلب فحص',
-            onClick: () => handleAddTest(patient),
-            icon: Search,
-            variant: 'outline' as const
+            label: 'حذف المريض',
+            onClick: () => handleDeletePatient(patient),
+            icon: Trash2,
+            variant: 'destructive' as const
           }
         ]}
         onAdd={() => window.location.href = '/doctor/patients/new'}

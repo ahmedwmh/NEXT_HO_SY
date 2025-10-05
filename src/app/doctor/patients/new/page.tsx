@@ -101,7 +101,9 @@ export default function AddPatientPage() {
     try {
       const response = await fetch('/api/patients', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify({
           ...formData,
           hospitalId: hospitalId,
@@ -255,6 +257,7 @@ export default function AddPatientPage() {
       setLoadingTests(false)
     }
   }
+
 
   const toggleTest = (test: any) => {
     setSelectedTests(prev => {

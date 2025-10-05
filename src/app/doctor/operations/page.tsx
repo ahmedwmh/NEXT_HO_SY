@@ -11,7 +11,6 @@ import {
   Stethoscope, 
   Building, 
   MapPin,
-  Eye,
   Edit,
   Trash2,
   Plus,
@@ -164,10 +163,6 @@ export default function DoctorOperationsPage() {
     window.location.href = `/doctor/operations/${operation.id}/edit`
   }
 
-  const handleView = (operation: Operation) => {
-    // Navigate to operation details
-    window.location.href = `/doctor/operations/${operation.id}`
-  }
 
   const handleDelete = async (operation: Operation) => {
     if (confirm('هل أنت متأكد من حذف هذه العملية؟')) {
@@ -230,7 +225,6 @@ export default function DoctorOperationsPage() {
           ]}
           onAdd={handleAdd}
           onEdit={handleEdit}
-          onView={handleView}
           onDelete={handleDelete}
           onRefresh={handleRefresh}
           addButtonText="إضافة عملية جديدة"

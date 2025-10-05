@@ -11,7 +11,6 @@ import {
   Stethoscope, 
   Building, 
   MapPin,
-  Eye,
   Edit,
   Trash2,
   Plus,
@@ -164,10 +163,6 @@ export default function DoctorTestsPage() {
     window.location.href = `/doctor/tests/${test.id}/edit`
   }
 
-  const handleView = (test: Test) => {
-    // Navigate to test details
-    window.location.href = `/doctor/tests/${test.id}`
-  }
 
   const handleDelete = async (test: Test) => {
     if (confirm('هل أنت متأكد من حذف هذا الفحص؟')) {
@@ -230,7 +225,6 @@ export default function DoctorTestsPage() {
           ]}
           onAdd={handleAdd}
           onEdit={handleEdit}
-          onView={handleView}
           onDelete={handleDelete}
           onRefresh={handleRefresh}
           addButtonText="إضافة فحص جديد"
