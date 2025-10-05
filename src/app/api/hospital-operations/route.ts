@@ -64,11 +64,14 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { hospitalId, operations } = await request.json()
+    const body = await request.json()
+    
+    // Handle both single operation and operations array
+    const { hospitalId, operations, ...singleOperation } = body
 
-    if (!hospitalId || !operations || !Array.isArray(operations)) {
+    if (!hospitalId) {
       return NextResponse.json(
-        { error: 'Hospital ID and operations array are required' },
+        { error: 'Hospital ID is required' },
         { status: 400 }
       )
     }
@@ -85,18 +88,34 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    let operationsToCreate = []
+    
+    // If operations array is provided, use it
+    if (operations && Array.isArray(operations)) {
+      operationsToCreate = operations
+    } 
+    // If single operation data is provided, wrap it in array
+    else if (singleOperation.name) {
+      operationsToCreate = [singleOperation]
+    } else {
+      return NextResponse.json(
+        { error: 'Operation data is required' },
+        { status: 400 }
+      )
+    }
+
     // Create operations
     const createdOperations = await Promise.all(
-      operations.map((operation: any) =>
+      operationsToCreate.map((operation: any) =>
         prisma.hospitalOperation.create({
           data: {
             hospitalId,
             name: operation.name,
             description: operation.description || '',
-            category: operation.category,
-            duration: operation.duration,
+            category: operation.category || '',
+            duration: operation.duration || '',
             cost: operation.cost || 0,
-            isActive: true
+            isActive: operation.isActive !== undefined ? operation.isActive : true
           }
         })
       )
