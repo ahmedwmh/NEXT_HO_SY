@@ -42,6 +42,17 @@ export async function GET(request: NextRequest) {
       prisma.doctor.count({ where: whereClause })
     ])
 
+    // Debug: Log first doctor structure
+    if (doctors.length > 0) {
+      console.log('👨‍⚕️ First doctor structure:', {
+        id: doctors[0].id,
+        firstName: doctors[0].firstName,
+        lastName: doctors[0].lastName,
+        hospitalId: doctors[0].hospitalId,
+        hospital: doctors[0].hospital
+      })
+    }
+
     return NextResponse.json({
       data: doctors,
       pagination: {

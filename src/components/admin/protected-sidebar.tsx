@@ -19,6 +19,7 @@ import {
   Activity,
   Menu,
   Shield,
+  Heart,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -79,90 +80,10 @@ const navigation: NavigationItem[] = [
     requiredPermission: { resource: 'PATIENTS', action: 'READ' }
   },
   { 
-    name: 'الزيارات', 
-    href: '/admin/visits', 
-    icon: Calendar,
-    requiredPermission: { resource: 'VISITS', action: 'READ' }
-  },
-  { 
-    name: 'الفحوصات', 
-    href: '/admin/tests/manage', 
-    icon: TestTube,
-    requiredPermission: { resource: 'TESTS', action: 'MANAGE' },
-    submenu: [
-      { 
-        name: 'إدارة الفحوصات', 
-        href: '/admin/tests/manage',
-        icon: TestTube,
-        requiredPermission: { resource: 'TESTS', action: 'MANAGE' }
-      },
-      { 
-        name: 'عرض الفحوصات', 
-        href: '/admin/tests',
-        icon: TestTube,
-        requiredPermission: { resource: 'TESTS', action: 'READ' }
-      }
-    ]
-  },
-  { 
-    name: 'العلاجات', 
-    href: '/admin/treatments/manage', 
-    icon: Stethoscope,
-    requiredPermission: { resource: 'TREATMENTS', action: 'MANAGE' },
-    submenu: [
-      { 
-        name: 'إدارة العلاجات', 
-        href: '/admin/treatments/manage',
-        icon: Stethoscope,
-        requiredPermission: { resource: 'TREATMENTS', action: 'MANAGE' }
-      },
-      { 
-        name: 'عرض العلاجات', 
-        href: '/admin/treatments',
-        icon: Stethoscope,
-        requiredPermission: { resource: 'TREATMENTS', action: 'READ' }
-      }
-    ]
-  },
-  { 
-    name: 'العمليات', 
-    href: '/admin/operations/manage', 
-    icon: Activity,
-    requiredPermission: { resource: 'OPERATIONS', action: 'MANAGE' },
-    submenu: [
-      { 
-        name: 'إدارة العمليات', 
-        href: '/admin/operations/manage',
-        icon: Activity,
-        requiredPermission: { resource: 'OPERATIONS', action: 'MANAGE' }
-      },
-      { 
-        name: 'عرض العمليات', 
-        href: '/admin/operations',
-        icon: Activity,
-        requiredPermission: { resource: 'OPERATIONS', action: 'READ' }
-      }
-    ]
-  },
-  { 
     name: 'الأمراض', 
-    href: '/admin/diseases/manage', 
-    icon: Activity,
-    requiredPermission: { resource: 'DISEASES', action: 'MANAGE' },
-    submenu: [
-      { 
-        name: 'إدارة الأمراض', 
-        href: '/admin/diseases/manage',
-        icon: Activity,
-        requiredPermission: { resource: 'DISEASES', action: 'MANAGE' }
-      },
-      { 
-        name: 'عرض الأمراض', 
-        href: '/admin/diseases',
-        icon: Activity,
-        requiredPermission: { resource: 'DISEASES', action: 'READ' }
-      }
-    ]
+    href: '/admin/diseases', 
+    icon: Heart,
+    requiredPermission: { resource: 'DISEASES', action: 'READ' }
   },
   { 
     name: 'التقارير', 

@@ -56,6 +56,9 @@ interface TestData {
   description: string
   scheduledAt: string
   results?: string
+  testStatus?: string
+  testStatusDescription?: string
+  testImages?: string[]
 }
 
 interface DiseaseData {
@@ -137,6 +140,14 @@ export default function ComprehensiveVisitSystem({
   defaultHospitalId,
   defaultCityId
 }: ComprehensiveVisitSystemProps) {
+  
+  console.log('🏥 ComprehensiveVisitSystem props - defaultHospitalId:', defaultHospitalId, 'defaultCityId:', defaultCityId)
+  
+  // Extract just the ID from the hospital name + ID string
+  const cleanHospitalId = defaultHospitalId?.includes('-') ? defaultHospitalId.split('-').pop() : defaultHospitalId
+  const cleanCityId = defaultCityId
+  
+  console.log('🏥 Cleaned IDs - hospitalId:', cleanHospitalId, 'cityId:', cleanCityId)
   const [currentStep, setCurrentStep] = useState(1)
   const [isLoading, setIsLoading] = useState(false)
   const [savedSteps, setSavedSteps] = useState<Set<number>>(new Set())
@@ -171,14 +182,85 @@ export default function ComprehensiveVisitSystem({
     notes: '',
     diagnosis: '',
     doctorId: '',
-    hospitalId: defaultHospitalId || '',
-    cityId: defaultCityId || '',
+    hospitalId: cleanHospitalId || '',
+    cityId: cleanCityId || '',
     tests: [],
     diseases: [],
     treatmentCourses: [],
     operations: [],
     medications: []
   })
+
+  // Update visitData when default values change
+  useEffect(() => {
+    console.log('🏥 Default hospital ID changed:', defaultHospitalId)
+    console.log('🏥 Default city ID changed:', defaultCityId)
+    console.log('🏥 Cleaned hospital ID:', cleanHospitalId)
+    console.log('🏥 Cleaned city ID:', cleanCityId)
+    console.log('🏥 Current visitData.hospitalId:', visitData.hospitalId)
+    console.log('🏥 Current visitData.cityId:', visitData.cityId)
+    
+    if (cleanHospitalId && cleanHospitalId !== visitData.hospitalId) {
+      console.log('🏥 Setting hospital ID from default:', cleanHospitalId)
+      setVisitData(prev => ({
+        ...prev,
+        hospitalId: cleanHospitalId
+      }))
+    }
+    
+    if (cleanCityId && cleanCityId !== visitData.cityId) {
+      console.log('🏙️ Setting city ID from default:', cleanCityId)
+      setVisitData(prev => ({
+        ...prev,
+        cityId: cleanCityId
+      }))
+    }
+  }, [defaultHospitalId, defaultCityId, cleanHospitalId, cleanCityId])
+
+  // Force update when component mounts with default values
+  useEffect(() => {
+    console.log('🚀 Mount effect - cleanHospitalId:', cleanHospitalId, 'cleanCityId:', cleanCityId)
+    console.log('🚀 Mount effect - current visitData.hospitalId:', visitData.hospitalId, 'visitData.cityId:', visitData.cityId)
+    
+    if (cleanHospitalId && !visitData.hospitalId) {
+      console.log('🚀 Force setting hospital ID on mount:', cleanHospitalId)
+      setVisitData(prev => ({
+        ...prev,
+        hospitalId: cleanHospitalId
+      }))
+    }
+    if (cleanCityId && !visitData.cityId) {
+      console.log('🚀 Force setting city ID on mount:', cleanCityId)
+      setVisitData(prev => ({
+        ...prev,
+        cityId: cleanCityId
+      }))
+    }
+  }, [cleanHospitalId, cleanCityId]) // Run when cleaned IDs change
+
+  // Additional effect to handle when default values change after mount
+  useEffect(() => {
+    console.log('🔄 Default values effect - cleanHospitalId:', cleanHospitalId, 'cleanCityId:', cleanCityId)
+    if (cleanHospitalId && cleanHospitalId !== visitData.hospitalId) {
+      console.log('🔄 Setting hospital ID from default values effect:', cleanHospitalId)
+      setVisitData(prev => ({
+        ...prev,
+        hospitalId: cleanHospitalId
+      }))
+    }
+    if (cleanCityId && cleanCityId !== visitData.cityId) {
+      console.log('🔄 Setting city ID from default values effect:', cleanCityId)
+      setVisitData(prev => ({
+        ...prev,
+        cityId: cleanCityId
+      }))
+    }
+  }, [cleanHospitalId, cleanCityId, visitData.hospitalId, visitData.cityId])
+
+  // Debug: Log when component mounts and defaultHospitalId is available
+  useEffect(() => {
+    console.log('🚀 Component mounted - defaultHospitalId:', defaultHospitalId, 'defaultCityId:', defaultCityId)
+  }, [])
 
   // Auto-fill patient data function
   const [isApplyingPatientData, setIsApplyingPatientData] = useState(false)
@@ -740,11 +822,19 @@ export default function ComprehensiveVisitSystem({
   console.log('💊 Debug - filteredTreatments sample:', filteredTreatments.slice(0, 3))
 
   const { data: availableOperations, isLoading: isLoadingOperations } = useQuery({
-    queryKey: ['hospital-operations'],
+    queryKey: ['hospital-operations', visitData.hospitalId],
     queryFn: async () => {
       console.log('🏥 ===== FETCHING AVAILABLE OPERATIONS =====')
+      console.log('🏥 Hospital ID:', visitData.hospitalId)
       
-      const response = await fetch('/api/hospital-operations')
+      // Build API URL with hospital filter
+      const apiUrl = visitData.hospitalId 
+        ? `/api/hospital-operations?hospitalId=${visitData.hospitalId}`
+        : '/api/hospital-operations'
+      
+      console.log('🌐 API endpoint:', apiUrl)
+      
+      const response = await fetch(apiUrl)
       
       if (!response.ok) {
         throw new Error('Failed to fetch operations')
@@ -752,10 +842,11 @@ export default function ComprehensiveVisitSystem({
       
       const result = await response.json()
       const allOperations = result.data || []
-      console.log('🏥 All operations count:', allOperations.length)
+      console.log('🏥 Filtered operations count:', allOperations.length)
       
       return allOperations
-    }
+    },
+    enabled: !!visitData.hospitalId
   })
 
   // Filter operations by selected hospital
@@ -768,17 +859,26 @@ export default function ComprehensiveVisitSystem({
   console.log('🏥 Debug - filteredOperations sample:', filteredOperations.slice(0, 3))
 
   const { data: availableMedications, isLoading: isLoadingMedications } = useQuery({
-    queryKey: ['medications'],
+    queryKey: ['medications', visitData.hospitalId],
     queryFn: async () => {
       console.log('💉 ===== FETCHING AVAILABLE MEDICATIONS =====')
+      console.log('🏥 Hospital ID:', visitData.hospitalId)
       
-      const response = await fetch('/api/medications')
+      // Build API URL with hospital filter
+      const apiUrl = visitData.hospitalId 
+        ? `/api/medications?hospitalId=${visitData.hospitalId}`
+        : '/api/medications'
+      
+      console.log('🌐 API endpoint:', apiUrl)
+      
+      const response = await fetch(apiUrl)
       const result = await response.json()
       const allMedications = result.data || []
-      console.log('💉 All medications count:', allMedications.length)
+      console.log('💉 Filtered medications count:', allMedications.length)
       
       return allMedications
-    }
+    },
+    enabled: !!visitData.hospitalId
   })
 
   // Filter medications by selected hospital (if medications have hospitalId)
@@ -796,13 +896,51 @@ export default function ComprehensiveVisitSystem({
   ) || []
 
   // Filter doctors based on selected hospital
-  const filteredDoctors = doctors?.filter((doctor: any) => 
-    !visitData.hospitalId || doctor.hospitalId === visitData.hospitalId
-  ) || []
+  const filteredDoctors = doctors?.filter((doctor: any) => {
+    // Extract the ID from the doctor's hospitalId (which might be "name-id" format)
+    const doctorHospitalId = doctor.hospitalId?.includes('-') ? doctor.hospitalId.split('-').pop() : doctor.hospitalId
+    const matches = !visitData.hospitalId || doctorHospitalId === visitData.hospitalId
+    
+    if (doctors && doctors.length > 0 && doctors.indexOf(doctor) < 3) { // Only log first 3 doctors
+      console.log('🔍 Doctor filter check:', {
+        doctorId: doctor.id,
+        doctorName: `${doctor.firstName} ${doctor.lastName}`,
+        originalDoctorHospitalId: doctor.hospitalId,
+        extractedDoctorHospitalId: doctorHospitalId,
+        visitHospitalId: visitData.hospitalId,
+        matches: matches
+      })
+    }
+    return matches
+  }) || []
+
+  // Debug: Check if any doctors have the matching hospital ID
+  if (doctors && visitData.hospitalId) {
+    const matchingDoctors = doctors.filter((doctor: any) => {
+      const doctorHospitalId = doctor.hospitalId?.includes('-') ? doctor.hospitalId.split('-').pop() : doctor.hospitalId
+      return doctorHospitalId === visitData.hospitalId
+    })
+    console.log('🔍 Doctors with matching hospital ID:', matchingDoctors.length, 'out of', doctors.length)
+    if (matchingDoctors.length > 0) {
+      console.log('🔍 First matching doctor:', {
+        id: matchingDoctors[0].id,
+        name: `${matchingDoctors[0].firstName} ${matchingDoctors[0].lastName}`,
+        originalHospitalId: matchingDoctors[0].hospitalId,
+        extractedHospitalId: matchingDoctors[0].hospitalId?.includes('-') ? matchingDoctors[0].hospitalId.split('-').pop() : matchingDoctors[0].hospitalId
+      })
+    }
+  }
 
   // Debug logs
   console.log('🔍 Debug - hospitals:', hospitals)
   console.log('🔍 Debug - doctors:', doctors)
+  console.log('🔍 Debug - first 3 doctors structure:', doctors?.slice(0, 3).map((d: any) => ({
+    id: d.id,
+    firstName: d.firstName,
+    lastName: d.lastName,
+    hospitalId: d.hospitalId,
+    specialization: d.specialization
+  })))
   console.log('🔍 Debug - filteredHospitals:', filteredHospitals)
   console.log('🔍 Debug - filteredDoctors:', filteredDoctors)
   console.log('🔍 Debug - visitData.cityId:', visitData.cityId)
@@ -1037,7 +1175,10 @@ export default function ComprehensiveVisitSystem({
       name: testName || '',
       description: testDescription || '',
       scheduledAt: new Date().toISOString().split('T')[0],
-      hospitalId: visitData.hospitalId
+      hospitalId: visitData.hospitalId,
+      testStatus: '',
+      testStatusDescription: '',
+      testImages: []
     }
     
     console.log('🆕 New test to add:', JSON.stringify(newTest, null, 2))
@@ -1090,6 +1231,75 @@ export default function ComprehensiveVisitSystem({
     
     console.log('✅ Test removed successfully!')
     console.log('📊 New tests count:', newTests.length)
+  }
+
+  // Handle test image upload
+  const handleTestImageUpload = async (testIndex: number, event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files
+    if (!files || files.length === 0) return
+
+    console.log('📤 Starting test image upload:', {
+      testIndex,
+      fileCount: files.length,
+      files: Array.from(files).map(f => ({ name: f.name, size: f.size, type: f.type }))
+    })
+
+    try {
+      const uploadPromises = Array.from(files).map(async (file, index) => {
+        console.log(`📤 Uploading file ${index + 1}/${files.length}:`, file.name)
+        
+        const formData = new FormData()
+        formData.append('file', file)
+        formData.append('folder', 'test-images')
+
+        const response = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData,
+        })
+
+        console.log('📤 Upload response:', {
+          status: response.status,
+          statusText: response.statusText,
+          ok: response.ok
+        })
+
+        if (!response.ok) {
+          const errorText = await response.text()
+          console.error('❌ Upload failed:', errorText)
+          throw new Error(`Failed to upload image: ${response.status} ${response.statusText}`)
+        }
+
+        const result = await response.json()
+        console.log('✅ Upload successful:', result)
+        return result.url
+      })
+
+      const uploadedUrls = await Promise.all(uploadPromises)
+      console.log('✅ All uploads completed:', uploadedUrls)
+
+      const newTests = [...visitData.tests]
+      newTests[testIndex] = {
+        ...newTests[testIndex],
+        testImages: [...(newTests[testIndex].testImages || []), ...uploadedUrls]
+      }
+      
+      setVisitData({ ...visitData, tests: newTests })
+      console.log('✅ Test images updated in state')
+    } catch (error) {
+      console.error('❌ Error uploading test images:', error)
+      // You might want to show a toast notification here
+    }
+  }
+
+  // Remove test image
+  const removeTestImage = (testIndex: number, imageIndex: number) => {
+    const newTests = [...visitData.tests]
+    newTests[testIndex] = {
+      ...newTests[testIndex],
+      testImages: newTests[testIndex].testImages?.filter((_, i) => i !== imageIndex) || []
+    }
+    
+    setVisitData({ ...visitData, tests: newTests })
   }
 
   // Disease management
@@ -1769,15 +1979,20 @@ export default function ComprehensiveVisitSystem({
                 </div>
                 <div>
                   <Label htmlFor="doctorId">الطبيب</Label>
+                  {/* Debug: Doctor dropdown state */}
+                  {(() => {
+                    console.log('🔍 Doctor dropdown debug - hospitalId:', visitData.hospitalId, 'isLoadingDoctors:', isLoadingDoctors, 'filteredDoctors length:', filteredDoctors?.length)
+                    return null
+                  })()}
                   <Select 
                     value={visitData.doctorId} 
                     onValueChange={(value) => setVisitData({...visitData, doctorId: value})}
-                    disabled={!visitData.hospitalId || isLoadingDoctors}
+                    disabled={!visitData.hospitalId || visitData.hospitalId === '' || isLoadingDoctors}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder={
                         isLoadingDoctors ? "جاري التحميل..." :
-                        visitData.hospitalId ? "اختر الطبيب" : "اختر المستشفى أولاً"
+                        (visitData.hospitalId && visitData.hospitalId !== '') ? "اختر الطبيب" : "اختر المستشفى أولاً"
                       } />
                     </SelectTrigger>
                     <SelectContent>
@@ -1898,6 +2113,21 @@ export default function ComprehensiveVisitSystem({
                   console.log('🧪 ===== RENDERING SELECTED TESTS =====')
                   console.log('🧪 Visit data tests:', JSON.stringify(visitData.tests, null, 2))
                   console.log('🧪 Tests count:', visitData.tests.length)
+                  
+                  // Check if new fields are present
+                  if (visitData.tests.length > 0) {
+                    const firstTest = visitData.tests[0]
+                    console.log('🧪 First test new fields check:', {
+                      hasTestStatus: 'testStatus' in firstTest,
+                      testStatusValue: firstTest.testStatus,
+                      hasTestStatusDescription: 'testStatusDescription' in firstTest,
+                      testStatusDescriptionValue: firstTest.testStatusDescription,
+                      hasTestImages: 'testImages' in firstTest,
+                      testImagesValue: firstTest.testImages,
+                      testImagesCount: firstTest.testImages?.length || 0
+                    })
+                  }
+                  
                   return null
                 })()}
               </div>
@@ -1946,6 +2176,69 @@ export default function ComprehensiveVisitSystem({
                           rows={2}
                         />
                       </div>
+                      
+                      {/* New fields for test status and description */}
+                      <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label>حالة الفحص</Label>
+                          <Input
+                            value={test.testStatus || ''}
+                            onChange={(e) => updateTest(index, 'testStatus', e.target.value)}
+                            placeholder="مثال: طبيعي، غير طبيعي، يحتاج متابعة..."
+                          />
+                        </div>
+                        <div>
+                          <Label>مرفقات الصور</Label>
+                          <div className="flex items-center space-x-2 rtl:space-x-reverse">
+                            <Input
+                              type="file"
+                              accept="image/*"
+                              multiple
+                              onChange={(e) => handleTestImageUpload(index, e)}
+                              className="text-sm"
+                            />
+                            <span className="text-xs text-gray-500">
+                              {test.testImages?.length || 0} صورة
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="mt-4">
+                        <Label>وصف حالة الفحص</Label>
+                        <Textarea
+                          value={test.testStatusDescription || ''}
+                          onChange={(e) => updateTest(index, 'testStatusDescription', e.target.value)}
+                          placeholder="وصف مفصل لحالة الفحص والنتائج..."
+                          rows={3}
+                        />
+                      </div>
+                      
+                      {/* Display uploaded images */}
+                      {test.testImages && test.testImages.length > 0 && (
+                        <div className="mt-4">
+                          <Label>الصور المرفقة</Label>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2">
+                            {test.testImages.map((imageUrl, imgIndex) => (
+                              <div key={imgIndex} className="relative">
+                                <img
+                                  src={imageUrl}
+                                  alt={`Test image ${imgIndex + 1}`}
+                                  className="w-full h-20 object-cover rounded border"
+                                />
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => removeTestImage(index, imgIndex)}
+                                  className="absolute -top-2 -right-2 h-6 w-6 p-0 bg-red-500 text-white hover:bg-red-600"
+                                >
+                                  ×
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

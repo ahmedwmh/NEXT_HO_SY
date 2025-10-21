@@ -99,7 +99,8 @@ export default function NewTestPage() {
                     <SelectItem value="blood">فحص الدم</SelectItem>
                     <SelectItem value="urine">فحص البول</SelectItem>
                     <SelectItem value="xray">الأشعة</SelectItem>
-                    <SelectItem value="ct">الأشعة المقطعية</SelectItem>
+                    <SelectItem value="ultrasound">سونار</SelectItem>
+                    <SelectItem value="endoscope">ناظور</SelectItem>
                     <SelectItem value="mri">الرنين المغناطيسي</SelectItem>
                     <SelectItem value="other">أخرى</SelectItem>
                   </SelectContent>

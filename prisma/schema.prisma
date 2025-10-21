@@ -387,6 +387,9 @@ model Visit {
   @@index([scheduledAt, status])
   @@index([hospitalId, scheduledAt])
   @@index([patientId, scheduledAt])
+  @@index([patientId, doctorId])
+  @@index([patientId, hospitalId])
+  @@index([patientId, scheduledAt, status])
   @@map("visits")
 }
 
@@ -403,6 +406,10 @@ model Test {
   results     String?
   notes       String?
   images      String[]   // صور الفحص
+  // New fields for test status and description
+  testStatus  String?    // حالة الفحص (نص)
+  testStatusDescription String? // وصف حالة الفحص (textarea)
+  testImages  String[]   // صور الفحص المرفقة (Supabase storage URLs)
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 
@@ -424,6 +431,8 @@ model Test {
   @@index([doctorId, status])
   @@index([patientId, scheduledAt])
   @@index([hospitalId, scheduledAt])
+  @@index([patientId, visitId])
+  @@index([patientId, scheduledAt, status])
   @@map("tests")
 }
 
@@ -711,6 +720,10 @@ model VisitDraftTest {
   results     String?
   notes       String?
   images      String[]
+  // New fields for test status and description
+  testStatus  String?    // حالة الفحص (نص)
+  testStatusDescription String? // وصف حالة الفحص (textarea)
+  testImages  String[]   // صور الفحص المرفقة (Supabase storage URLs)
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 

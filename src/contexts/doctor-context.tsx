@@ -29,6 +29,7 @@ export function DoctorProvider({ children, doctorId }: DoctorProviderProps) {
 
   const fetchDoctorData = async () => {
     if (!doctorId) {
+      console.log('🏥 No doctorId provided to DoctorProvider')
       setLoading(false)
       return
     }
@@ -36,6 +37,7 @@ export function DoctorProvider({ children, doctorId }: DoctorProviderProps) {
     try {
       setLoading(true)
       setError(null)
+      console.log('🏥 Fetching doctor data for ID:', doctorId)
 
       const response = await fetch(`/api/doctors/${doctorId}`)
       if (!response.ok) {
@@ -43,9 +45,14 @@ export function DoctorProvider({ children, doctorId }: DoctorProviderProps) {
       }
 
       const data = await response.json()
+      console.log('🏥 Doctor data fetched:', data)
+      console.log('🏥 Hospital ID from API:', data.hospital?.id)
+      console.log('🏥 City ID from API:', data.city?.id)
       setDoctor(data.doctor)
       setHospital(data.hospital)
       setCity(data.city)
+      console.log('🏥 Doctor context updated - hospital:', data.hospital?.name, 'city:', data.city?.name)
+      console.log('🏥 Doctor context updated - hospitalId:', data.hospital?.id, 'cityId:', data.city?.id)
     } catch (err) {
       console.error('خطأ في جلب بيانات الطبيب:', err)
       setError(err instanceof Error ? err.message : 'حدث خطأ غير متوقع')
@@ -90,12 +97,19 @@ export function useDoctor() {
 export function useDoctorData() {
   const { doctor, hospital, city, loading, error } = useDoctor()
   
+  const hospitalId = hospital?.id
+  const cityId = city?.id
+  
+  console.log('🏥 useDoctorData - hospital object:', hospital)
+  console.log('🏥 useDoctorData - city object:', city)
+  console.log('🏥 useDoctorData - hospitalId:', hospitalId, 'cityId:', cityId, 'loading:', loading)
+  
   return {
     doctor,
     hospital,
     city,
-    hospitalId: hospital?.id,
-    cityId: city?.id,
+    hospitalId,
+    cityId,
     loading,
     error,
     // Helper functions

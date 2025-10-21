@@ -25,9 +25,10 @@ const navigation = [
   { name: 'لوحة التحكم', href: '/doctor', icon: LayoutDashboard },
   { name: 'المرضى', href: '/doctor/patients', icon: Users },
   { name: 'إضافة مريض', href: '/doctor/patients/new', icon: UserPlus },
+  { name: 'الأمراض', href: '/doctor/diseases', icon: Heart },
   { name: 'العلاجات', href: '/doctor/treatments', icon: Pill },
   { name: 'الفحوصات', href: '/doctor/tests', icon: TestTube },
-  { name: 'العمليات', href: '/doctor/operations', icon: Heart },
+  { name: 'العمليات', href: '/doctor/operations', icon: Activity },
   { name: 'التقارير', href: '/doctor/reports', icon: FileText },
   { name: 'الإعدادات', href: '/doctor/settings', icon: Settings },
 ]

@@ -13,7 +13,11 @@ export async function GET(request: NextRequest) {
     const where: any = {}
     
     if (hospitalId) {
-      where.hospitalId = hospitalId
+      // Handle both formats: "name-id" and "id"
+      where.OR = [
+        { hospitalId: hospitalId },
+        { hospitalId: { contains: hospitalId } }
+      ]
     }
     
     if (category) {

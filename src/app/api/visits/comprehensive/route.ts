@@ -61,7 +61,31 @@ export async function POST(request: NextRequest) {
       return value
     }
 
-    let normalizedHospitalId = extractId(hospitalId)
+    // Handle both formats: "name-id" and "id"
+    const findHospitalId = async (hospitalId?: string) => {
+      if (!hospitalId) return null
+      
+      // First try direct match
+      let hospital = await prisma.hospital.findUnique({ where: { id: hospitalId } })
+      if (hospital) return hospital.id
+      
+      // If not found, try to find by ID part
+      const extractedId = extractId(hospitalId)
+      if (extractedId && extractedId !== hospitalId) {
+        hospital = await prisma.hospital.findUnique({ where: { id: extractedId } })
+        if (hospital) return hospital.id
+      }
+      
+      // If still not found, try to find by contains
+      const hospitals = await prisma.hospital.findMany({
+        where: { id: { contains: extractedId || hospitalId } }
+      })
+      if (hospitals.length > 0) return hospitals[0].id
+      
+      return null
+    }
+
+    let normalizedHospitalId = await findHospitalId(hospitalId)
 
     // Verify hospital exists; if not, fall back to patient's hospital
     let hospitalRecord = normalizedHospitalId
@@ -122,7 +146,10 @@ export async function POST(request: NextRequest) {
             description: test.description || '',
             scheduledAt: new Date(test.scheduledAt || scheduledAt),
             results: test.results || null,
-            notes: test.notes || null
+            notes: test.notes || null,
+            testStatus: test.testStatus || null,
+            testStatusDescription: test.testStatusDescription || null,
+            testImages: test.testImages || []
           }))
         })
       }
@@ -178,12 +205,15 @@ export async function POST(request: NextRequest) {
           visitId: visit.id,
           patientId,
           doctorId: doctorId || 'temp-doctor',
-          hospitalId: normalizedHospitalId || 'temp-hospital',
           name: medication.name,
           dosage: medication.dosage || '',
+          frequency: medication.frequency || '',
+          duration: medication.duration || '',
           instructions: medication.instructions || '',
           startDate: new Date(medication.startDate || scheduledAt),
-          endDate: medication.endDate ? new Date(medication.endDate) : null
+          endDate: medication.endDate ? new Date(medication.endDate) : null,
+          status: medication.status || 'Active',
+          notes: medication.notes || null
         }))
       })
     }
@@ -341,8 +371,17 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     console.error('خطأ في إنشاء الزيارة الشاملة:', error)
+    console.error('Error details:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      name: error instanceof Error ? error.name : undefined
+    })
     return NextResponse.json(
-      { success: false, error: 'فشل في إنشاء الزيارة الشاملة' },
+      { 
+        success: false, 
+        error: 'فشل في إنشاء الزيارة الشاملة',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     )
   }
@@ -383,12 +422,38 @@ export async function PUT(request: NextRequest) {
       medicationsCount: medications.length
     })
 
+    // Handle hospital ID resolution for PUT method
+    const findHospitalId = async (hospitalId?: string) => {
+      if (!hospitalId) return null
+      
+      // First try direct match
+      let hospital = await prisma.hospital.findUnique({ where: { id: hospitalId } })
+      if (hospital) return hospital.id
+      
+      // If not found, try to find by ID part
+      const extractedId = hospitalId.includes('-') ? hospitalId.split('-').pop() : hospitalId
+      if (extractedId && extractedId !== hospitalId) {
+        hospital = await prisma.hospital.findUnique({ where: { id: extractedId } })
+        if (hospital) return hospital.id
+      }
+      
+      // If still not found, try to find by contains
+      const hospitals = await prisma.hospital.findMany({
+        where: { id: { contains: extractedId || hospitalId } }
+      })
+      if (hospitals.length > 0) return hospitals[0].id
+      
+      return null
+    }
+
+    const normalizedHospitalId = await findHospitalId(hospitalId)
+
     // Update visit basic info
     const visit = await prisma.visit.update({
       where: { id },
       data: {
         doctorId: doctorId || null,
-        hospitalId: hospitalId || null,
+        hospitalId: normalizedHospitalId || null,
         cityId: cityId || null,
         scheduledAt: new Date(scheduledAt),
         status: status as any,
@@ -443,12 +508,15 @@ export async function PUT(request: NextRequest) {
             visitId: id,
             patientId,
             doctorId: doctorId || '',
-            hospitalId: hospitalId || '',
+            hospitalId: normalizedHospitalId || '',
             name: test.name,
             description: test.description || '',
             scheduledAt: new Date(test.scheduledAt),
             results: test.results || null,
-            notes: test.notes || null
+            notes: test.notes || null,
+            testStatus: test.testStatus || null,
+            testStatusDescription: test.testStatusDescription || null,
+            testImages: test.testImages || []
           }))
         })
       }
@@ -460,7 +528,7 @@ export async function PUT(request: NextRequest) {
           visitId: id,
           patientId,
           doctorId: doctorId || '',
-          hospitalId: hospitalId || '',
+          hospitalId: normalizedHospitalId || '',
           name: treatment.name,
           description: treatment.description || '',
           scheduledAt: new Date(treatment.scheduledAt),
@@ -475,7 +543,7 @@ export async function PUT(request: NextRequest) {
           visitId: id,
           patientId,
           doctorId: doctorId || '',
-          hospitalId: hospitalId || '',
+          hospitalId: normalizedHospitalId || '',
           name: operation.name,
           description: operation.description || '',
           scheduledAt: new Date(operation.scheduledAt),
@@ -490,12 +558,15 @@ export async function PUT(request: NextRequest) {
           visitId: id,
           patientId,
           doctorId: doctorId || '',
-          hospitalId: hospitalId || '',
           name: medication.name,
           dosage: medication.dosage || '',
+          frequency: medication.frequency || '',
+          duration: medication.duration || '',
           instructions: medication.instructions || '',
           startDate: new Date(medication.startDate),
-          endDate: medication.endDate ? new Date(medication.endDate) : null
+          endDate: medication.endDate ? new Date(medication.endDate) : null,
+          status: medication.status || 'Active',
+          notes: medication.notes || null
         }))
       })
     }
@@ -539,7 +610,7 @@ export async function PUT(request: NextRequest) {
             data: {
               patientId,
               doctorId: doctorId || 'temp-doctor',
-              hospitalId: hospitalId || 'temp-hospital',
+              hospitalId: normalizedHospitalId || 'temp-hospital',
               hospitalTreatmentId: course.hospitalTreatmentId,
               courseName: course.courseName,
               description: course.description || '',

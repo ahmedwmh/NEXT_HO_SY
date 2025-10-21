@@ -6,13 +6,24 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const limit = parseInt(searchParams.get('limit') || '50')
     const search = searchParams.get('search') || ''
+    const hospitalId = searchParams.get('hospitalId')
 
-    const whereClause = search ? {
-      name: {
+    const whereClause: any = {}
+    
+    if (search) {
+      whereClause.name = {
         contains: search,
         mode: 'insensitive' as const
       }
-    } : {}
+    }
+    
+    // Medications are linked to doctors, not hospitals directly
+    // We'll filter by doctor's hospital if hospitalId is provided
+    if (hospitalId) {
+      whereClause.doctor = {
+        hospitalId: { contains: hospitalId }
+      }
+    }
 
     const medications = await prisma.medication.findMany({
       where: whereClause,
@@ -62,6 +73,64 @@ export async function GET(request: NextRequest) {
     console.error('Error fetching medications:', error)
     return NextResponse.json(
       { success: false, error: 'Failed to fetch medications' },
+      { status: 500 }
+    )
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const data = await request.json()
+
+    const medication = await prisma.medication.create({
+      data: {
+        patientId: data.patientId,
+        doctorId: data.doctorId,
+        visitId: data.visitId,
+        name: data.name,
+        dosage: data.dosage,
+        frequency: data.frequency,
+        duration: data.duration,
+        instructions: data.instructions,
+        startDate: new Date(data.startDate),
+        endDate: data.endDate ? new Date(data.endDate) : null,
+        status: data.status || 'Active',
+        notes: data.notes
+      },
+      include: {
+        patient: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            patientNumber: true
+          }
+        },
+        doctor: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            specialization: true
+          }
+        },
+        visit: {
+          select: {
+            id: true,
+            scheduledAt: true
+          }
+        }
+      }
+    })
+
+    return NextResponse.json({
+      success: true,
+      data: medication
+    })
+  } catch (error) {
+    console.error('Error creating medication:', error)
+    return NextResponse.json(
+      { success: false, error: 'Failed to create medication' },
       { status: 500 }
     )
   }

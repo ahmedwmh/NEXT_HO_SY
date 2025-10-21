@@ -107,7 +107,10 @@ export async function POST(request: NextRequest) {
         status: data.status || 'SCHEDULED',
         results: data.results,
         notes: data.notes,
-        images: data.images || []
+        images: data.images || [],
+        testStatus: data.testStatus,
+        testStatusDescription: data.testStatusDescription,
+        testImages: data.testImages || []
       },
       include: {
         patient: {

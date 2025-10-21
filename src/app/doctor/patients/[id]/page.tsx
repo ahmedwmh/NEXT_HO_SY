@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import { useQuery } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -27,6 +28,7 @@ import TreatmentCoursesManagement from '@/components/admin/treatment-courses-man
 import TestsManagement from '@/components/admin/tests-management'
 import OperationsManagement from '@/components/admin/operations-management'
 import { useDoctorDataFilter } from '@/hooks/use-doctor-data'
+import { PatientPageSkeleton } from '@/components/ui/patient-page-skeleton'
 
 interface Patient {
   id: string
@@ -126,12 +128,11 @@ export default function PatientDetailsPage() {
   const params = useParams()
   const router = useRouter()
   const patientId = params.id as string
-  const { hospitalId, cityId } = useDoctorDataFilter()
+  const { hospitalId, cityId, loading: doctorDataLoading } = useDoctorDataFilter()
   
-  const [patient, setPatient] = useState<Patient | null>(null)
-  const [patientImages, setPatientImages] = useState<PatientImage[]>([])
-  const [visits, setVisits] = useState<Visit[]>([])
-  const [loading, setLoading] = useState(true)
+  // Debug: Log the values from useDoctorDataFilter
+  console.log('🏥 useDoctorDataFilter values - hospitalId:', hospitalId, 'cityId:', cityId, 'loading:', doctorDataLoading)
+  
   const [showVisitForm, setShowVisitForm] = useState(false)
   const [showVisitDetails, setShowVisitDetails] = useState(false)
   const [selectedVisitId, setSelectedVisitId] = useState<string | null>(null)
@@ -142,63 +143,50 @@ export default function PatientDetailsPage() {
   const [selectedTestVisitId, setSelectedTestVisitId] = useState<string | null>(null)
   const [selectedOperationVisitId, setSelectedOperationVisitId] = useState<string | null>(null)
 
-  const fetchPatientData = async () => {
-    try {
-      setLoading(true)
-      
-      // Fetch patient details
-      const patientResponse = await fetch(`/api/patients/${patientId}`)
-      const patientData = await patientResponse.json()
-      
-      if (patientData.success) {
-        setPatient(patientData.data)
-      }
+  // Use React Query for data fetching with caching
+  const { data: patient, isLoading: patientLoading, error: patientError } = useQuery({
+    queryKey: ['patient', patientId],
+    queryFn: async () => {
+      const response = await fetch(`/api/patients/${patientId}/details`)
+      const data = await response.json()
+      if (!data.success) throw new Error(data.error)
+      return data.data
+    },
+    enabled: !!patientId,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes
+  })
 
-      // Fetch patient images
-      const imagesResponse = await fetch(`/api/patients/${patientId}/images`)
-      const imagesData = await imagesResponse.json()
-      
-      console.log('🖼️ Images response:', imagesData)
-      
-      if (imagesData.success) {
-        setPatientImages(imagesData.data || [])
-        console.log('🖼️ Patient images set:', imagesData.data)
-      }
+  const { data: patientImages = [], isLoading: imagesLoading } = useQuery({
+    queryKey: ['patient-images', patientId],
+    queryFn: async () => {
+      const response = await fetch(`/api/patients/${patientId}/images`)
+      const data = await response.json()
+      if (!data.success) throw new Error(data.error)
+      return data.data || []
+    },
+    enabled: !!patientId,
+    staleTime: 10 * 60 * 1000, // 10 minutes
+  })
 
-      // Fetch patient visits
-      const visitsResponse = await fetch(`/api/visits?patientId=${patientId}`)
-      const visitsData = await visitsResponse.json()
-      
-      if (visitsData.success) {
-        setVisits(visitsData.data || [])
-      }
+  const { data: visits = [], isLoading: visitsLoading, refetch: refetchVisits } = useQuery({
+    queryKey: ['patient-visits', patientId],
+    queryFn: async () => {
+      const response = await fetch(`/api/patients/${patientId}/visits`)
+      const data = await response.json()
+      if (!data.success) throw new Error(data.error)
+      return data.data || []
+    },
+    enabled: !!patientId,
+    staleTime: 2 * 60 * 1000, // 2 minutes
+  })
 
-    } catch (error) {
-      console.error('Error fetching patient data:', error)
-    } finally {
-      setLoading(false)
-    }
+  const loading = patientLoading || imagesLoading || visitsLoading
+
+  // Helper function to refresh visits data
+  const refreshVisits = () => {
+    refetchVisits()
   }
-
-  const fetchVisitsOnly = async () => {
-    try {
-      // Only fetch visits data without loading state
-      const visitsResponse = await fetch(`/api/visits?patientId=${patientId}`)
-      const visitsData = await visitsResponse.json()
-      
-      if (visitsData.success) {
-        setVisits(visitsData.data || [])
-      }
-    } catch (error) {
-      console.error('Error fetching visits data:', error)
-    }
-  }
-
-  useEffect(() => {
-    if (patientId) {
-      fetchPatientData()
-    }
-  }, [patientId])
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('ar-SA', {
@@ -220,10 +208,17 @@ export default function PatientDetailsPage() {
   }
 
   if (loading) {
+    return <PatientPageSkeleton />
+  }
+
+  if (patientError) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        <span className="mr-3">جاري التحميل...</span>
+      <div className="text-center py-12">
+        <h1 className="text-2xl font-bold text-red-600 mb-4">خطأ في تحميل البيانات</h1>
+        <p className="text-gray-600 mb-4">{patientError.message}</p>
+        <Button onClick={() => window.location.reload()}>
+          إعادة المحاولة
+        </Button>
       </div>
     )
   }
@@ -386,7 +381,7 @@ export default function PatientDetailsPage() {
         <CardContent>
           {patientImages.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {patientImages.map((image) => (
+              {patientImages.map((image: any) => (
                 <div key={image.id} className="relative group">
                   <img
                     src={image.imageUrl}
@@ -444,7 +439,7 @@ export default function PatientDetailsPage() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {visits.map((visit) => (
+                  {visits.map((visit: any) => (
                     <div 
                       key={visit.id} 
                       className="border rounded-lg p-4 cursor-pointer hover:bg-gray-50 transition-colors"
@@ -535,7 +530,7 @@ export default function PatientDetailsPage() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {visits.map((visit) => (
+                  {visits.map((visit: any) => (
                     <div key={visit.id} className="border rounded-lg p-4">
                       <div className="flex items-center justify-between mb-2">
                         <h3 className="font-semibold">
@@ -560,7 +555,7 @@ export default function PatientDetailsPage() {
                       </div>
                       {visit.tests && visit.tests.length > 0 ? (
                         <div className="space-y-2">
-                          {visit.tests.map((test, index) => (
+                          {visit.tests.map((test: any, index: number) => (
                             <div key={test.id || index} className="bg-gray-50 rounded p-3">
                               <div className="flex items-center justify-between">
                                 <h4 className="font-medium">{test.name}</h4>
@@ -575,6 +570,35 @@ export default function PatientDetailsPage() {
                                 <p className="text-sm text-gray-800 mt-1">
                                   <strong>النتائج:</strong> {test.results}
                                 </p>
+                              )}
+                              {/* New fields for test status and description */}
+                              {test.testStatus && (
+                                <p className="text-sm text-purple-600 mt-1">
+                                  <strong>حالة الفحص:</strong> {test.testStatus}
+                                </p>
+                              )}
+                              {test.testStatusDescription && (
+                                <p className="text-sm text-indigo-600 mt-1">
+                                  <strong>وصف حالة الفحص:</strong> {test.testStatusDescription}
+                                </p>
+                              )}
+                              {/* Display test images */}
+                              {test.testImages && test.testImages.length > 0 && (
+                                <div className="mt-2">
+                                  <p className="text-sm font-medium text-gray-700 mb-2">صور الفحص:</p>
+                                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                                    {test.testImages.map((imageUrl: string, imgIndex: number) => (
+                                      <div key={imgIndex} className="relative">
+                                        <img
+                                          src={imageUrl}
+                                          alt={`Test image ${imgIndex + 1}`}
+                                          className="w-full h-20 object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity"
+                                          onClick={() => window.open(imageUrl, '_blank')}
+                                        />
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
                               )}
                             </div>
                           ))}
@@ -621,7 +645,7 @@ export default function PatientDetailsPage() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {visits.map((visit) => (
+                  {visits.map((visit: any) => (
                     <div key={visit.id} className="border rounded-lg p-4">
                       <div className="flex items-center justify-between mb-2">
                         <h3 className="font-semibold">
@@ -646,7 +670,7 @@ export default function PatientDetailsPage() {
                       </div>
                       {visit.treatments && visit.treatments.length > 0 ? (
                         <div className="space-y-2">
-                          {visit.treatments.map((treatment, index) => (
+                          {visit.treatments.map((treatment: any, index: number) => (
                             <div key={treatment.id || index} className="bg-gray-50 rounded p-3">
                               <div className="flex items-center justify-between">
                                 <h4 className="font-medium">{treatment.name}</h4>
@@ -702,7 +726,7 @@ export default function PatientDetailsPage() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {visits.map((visit) => (
+                  {visits.map((visit: any) => (
                     <div key={visit.id} className="border rounded-lg p-4">
                       <div className="flex items-center justify-between mb-2">
                         <h3 className="font-semibold">
@@ -727,7 +751,7 @@ export default function PatientDetailsPage() {
                       </div>
                       {visit.operations && visit.operations.length > 0 ? (
                         <div className="space-y-2">
-                          {visit.operations.map((operation, index) => (
+                          {visit.operations.map((operation: any, index: number) => (
                             <div key={operation.id || index} className="bg-gray-50 rounded p-3">
                               <div className="flex items-center justify-between">
                                 <h4 className="font-medium">{operation.name}</h4>
@@ -754,18 +778,33 @@ export default function PatientDetailsPage() {
       </Tabs>
 
       {/* Visit Form Modal */}
-      {showVisitForm && (
-        <ComprehensiveVisitSystem
-          patientId={patientId}
-          isOpen={showVisitForm}
-          onClose={() => {
-            setShowVisitForm(false)
-            // Refresh patient data when visit form is closed
-            fetchPatientData()
-          }}
-          defaultHospitalId={hospitalId}
-          defaultCityId={cityId}
-        />
+      {showVisitForm && !doctorDataLoading && hospitalId && cityId && (
+        <>
+          {console.log('🏥 Passing to ComprehensiveVisitSystem - hospitalId:', hospitalId, 'cityId:', cityId)}
+          <ComprehensiveVisitSystem
+            patientId={patientId}
+            isOpen={showVisitForm}
+            onClose={() => {
+              setShowVisitForm(false)
+              // Refresh visits data when visit form is closed
+              refreshVisits()
+            }}
+            defaultHospitalId={hospitalId}
+            defaultCityId={cityId}
+          />
+        </>
+      )}
+      
+      {/* Loading state for visit form */}
+      {showVisitForm && (doctorDataLoading || !hospitalId || !cityId) && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <div className="flex flex-col items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
+              <p className="text-lg text-gray-600">جاري تحميل بيانات الطبيب...</p>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Visit Details Modal */}
@@ -789,8 +828,8 @@ export default function PatientDetailsPage() {
           onClose={() => {
             setShowTreatmentCourses(false)
             setSelectedCourseVisitId(null)
-            // Only refresh visits data, not the entire page
-            fetchVisitsOnly()
+            // Refresh visits data
+            refreshVisits()
           }}
         />
       )}
@@ -804,8 +843,8 @@ export default function PatientDetailsPage() {
           onClose={() => {
             setShowTestsManagement(false)
             setSelectedTestVisitId(null)
-            // Only refresh visits data, not the entire page
-            fetchVisitsOnly()
+            // Refresh visits data
+            refreshVisits()
           }}
         />
       )}
@@ -819,8 +858,8 @@ export default function PatientDetailsPage() {
           onClose={() => {
             setShowOperationsManagement(false)
             setSelectedOperationVisitId(null)
-            // Only refresh visits data, not the entire page
-            fetchVisitsOnly()
+            // Refresh visits data
+            refreshVisits()
           }}
         />
       )}

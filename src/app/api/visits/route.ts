@@ -130,70 +130,8 @@ export async function GET(request: NextRequest) {
       prisma.visit.count({ where: whereClause })
     ])
 
-    // Attach patient diseases to each visit (no direct relation in schema)
-    let visits = visitsBase as any[]
-
-    // Enrich with patient-level tests/treatments/operations/medications around the visit date (or linked by visitId)
-    try {
-      const dayMs = 24 * 60 * 60 * 1000
-      const enriched = [] as any[]
-      for (const v of visits) {
-        // If relations already present with items, keep them; otherwise fetch by window
-        const [testsExtra, treatmentsExtra, operationsExtra, medicationsExtra] = await Promise.all([
-          (v.tests && v.tests.length > 0) ? Promise.resolve([]) : prisma.test.findMany({
-            where: {
-              patientId: v.patientId,
-              OR: [
-                { visitId: v.id },
-                { scheduledAt: { gte: new Date(new Date(v.scheduledAt).getTime() - dayMs), lte: new Date(new Date(v.scheduledAt).getTime() + dayMs) } }
-              ]
-            },
-            select: { id: true, name: true, description: true, status: true }
-          }),
-          (v.treatments && v.treatments.length > 0) ? Promise.resolve([]) : prisma.treatment.findMany({
-            where: {
-              patientId: v.patientId,
-              OR: [
-                { visitId: v.id },
-                { scheduledAt: { gte: new Date(new Date(v.scheduledAt).getTime() - dayMs), lte: new Date(new Date(v.scheduledAt).getTime() + dayMs) } }
-              ]
-            },
-            select: { id: true, name: true, description: true, status: true }
-          }),
-          (v.operations && v.operations.length > 0) ? Promise.resolve([]) : prisma.operation.findMany({
-            where: {
-              patientId: v.patientId,
-              OR: [
-                { visitId: v.id },
-                { scheduledAt: { gte: new Date(new Date(v.scheduledAt).getTime() - dayMs), lte: new Date(new Date(v.scheduledAt).getTime() + dayMs) } }
-              ]
-            },
-            select: { id: true, name: true, description: true, status: true }
-          }),
-          (v.medications && v.medications.length > 0) ? Promise.resolve([]) : prisma.medication.findMany({
-            where: {
-              patientId: v.patientId,
-              OR: [
-                { visitId: v.id },
-                { startDate: { lte: new Date(new Date(v.scheduledAt).getTime() + dayMs) }, endDate: { gte: new Date(new Date(v.scheduledAt).getTime() - dayMs) } }
-              ]
-            },
-            select: { id: true, name: true, dosage: true, frequency: true, duration: true, instructions: true }
-          })
-        ])
-
-        enriched.push({
-          ...v,
-          tests: (v.tests && v.tests.length > 0) ? v.tests : testsExtra,
-          treatments: (v.treatments && v.treatments.length > 0) ? v.treatments : treatmentsExtra,
-          operations: (v.operations && v.operations.length > 0) ? v.operations : operationsExtra,
-          medications: (v.medications && v.medications.length > 0) ? v.medications : medicationsExtra
-        })
-      }
-      visits = enriched
-    } catch (e) {
-      console.error('Failed to attach related records to visits:', e)
-    }
+    // Return visits with already included relations - no additional queries needed
+    const visits = visitsBase
 
     return NextResponse.json({
       success: true,

@@ -16,6 +16,9 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
         results: data.results,
         notes: data.notes,
         images: data.images,
+        testStatus: data.testStatus,
+        testStatusDescription: data.testStatusDescription,
+        testImages: data.testImages,
       },
     })
 
